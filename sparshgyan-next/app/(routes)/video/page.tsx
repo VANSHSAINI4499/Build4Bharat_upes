@@ -1,22 +1,36 @@
 'use client'
 
-import React, { useMemo, Suspense } from 'react'
+import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Play, Volume2, VolumeX, Mic, MicOff, BookOpen, ChevronRight } from 'lucide-react'
+import {
+  Play,
+  BookOpen,
+  ChevronRight,
+  MonitorPlay,
+  Radio,
+  AlertCircle,
+  Loader2,
+  Subtitles,
+} from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
-import { useSpeech } from '@/lib/hooks/useSpeech'
 import { useSerial } from '@/lib/hooks/useSerial'
 import { ArduinoPanel } from '@/components/accessibility/ArduinoPanel'
 import { BrailleDisplay } from '@/components/accessibility/BrailleDisplay'
-import { VoiceWaveform } from '@/components/magic/VoiceWaveform'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 
+/* ── Caption segment type (matches API) ─────────────────────────── */
+interface CaptionSegment {
+  start: number
+  dur: number
+  text: string
+}
+
+/* ── Course metadata ────────────────────────────────────────────── */
 const COURSE_META: Record<string, { description: string; level: string; duration: string }> = {
   'AI for Accessibility': {
     description: 'Learn how AI helps people with disabilities — from vision assistance to speech recognition.',
@@ -35,42 +49,176 @@ const COURSE_META: Record<string, { description: string; level: string; duration
   },
 }
 
+const VIDEO_ID = 'Oe_h_M7Drec'
+
+/* ================================================================ */
+/*  VideoPageInner                                                   */
+/* ================================================================ */
 function VideoPageInner() {
   const searchParams = useSearchParams()
   const courseTitle = searchParams.get('course') ?? 'AI for Accessibility'
   const courseMeta = COURSE_META[courseTitle] ?? COURSE_META['AI for Accessibility']
 
-  const isListening = useAppStore((s) => s.isListening)
-  const windowText = useAppStore((s) => s.windowText)
-  const interimText = useAppStore((s) => s.interimText)
-  const ttsEnabled = useAppStore((s) => s.ttsEnabled)
+  const videoCaptionMode = useAppStore((s) => s.videoCaptionMode)
+  const arduinoConnected = useAppStore((s) => s.arduinoConnected)
+  const autoVibrate = useAppStore((s) => s.autoVibrate)
 
-  const { startListening, stopListening, setEnqueue } = useSpeech()
   const { enqueue } = useSerial()
 
-  useEffect(() => { setEnqueue(enqueue) }, [enqueue, setEnqueue])
+  /* ── Caption fetch state ─────────────────────────────────────── */
+  const [captions, setCaptions] = useState<CaptionSegment[]>([])
+  const [captionLoading, setCaptionLoading] = useState(false)
+  const [captionError, setCaptionError] = useState('')
 
-  const displayText = useMemo(
-    () => (interimText ? `${windowText} ${interimText}` : windowText),
-    [windowText, interimText]
+  /* ── Playback sync state ────────────────────────────────────── */
+  const [currentCaption, setCurrentCaption] = useState('')
+  const [videoPlaying, setVideoPlaying] = useState(false)
+  const lastSentRef = useRef('')
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const currentTimeRef = useRef(0)
+
+  /* ── Transcript accumulator ──────────────────────────────────── */
+  const [transcript, setTranscript] = useState<string[]>([])
+
+  /* ── Listen for postMessage from YouTube iframe (for getCurrentTime) ── */
+  useEffect(() => {
+    const handler = (e: MessageEvent) => {
+      if (e.origin !== 'https://www.youtube.com') return
+      try {
+        const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data
+        // YouTube sends playerState changes via info delivery
+        if (data?.event === 'infoDelivery' && data?.info) {
+          if (typeof data.info.currentTime === 'number') {
+            currentTimeRef.current = data.info.currentTime
+          }
+          if (typeof data.info.playerState === 'number') {
+            // 1 = PLAYING, 3 = BUFFERING
+            setVideoPlaying(data.info.playerState === 1 || data.info.playerState === 3)
+          }
+        }
+        if (data?.event === 'onStateChange') {
+          setVideoPlaying(data.info === 1 || data.info === 3)
+        }
+      } catch {
+        // not JSON — ignore
+      }
+    }
+    window.addEventListener('message', handler)
+    return () => window.removeEventListener('message', handler)
+  }, [])
+
+  /* ── Send "listening" command to YouTube iframe to get time updates ── */
+  useEffect(() => {
+    if (!videoCaptionMode || !iframeRef.current) return
+    // Tell YouTube iframe to send us info updates
+    const sendListen = () => {
+      iframeRef.current?.contentWindow?.postMessage(
+        JSON.stringify({ event: 'listening', id: 0 }),
+        'https://www.youtube.com',
+      )
+    }
+    // Need to send after iframe loads; re-send periodically to keep alive
+    sendListen()
+    const id = setInterval(sendListen, 1000)
+    return () => clearInterval(id)
+  }, [videoCaptionMode])
+
+  /* ── Fetch captions when toggle is turned ON ──────────────────── */
+  const fetchCaptions = useCallback(async () => {
+    setCaptionLoading(true)
+    setCaptionError('')
+    try {
+      const res = await fetch(`/api/captions?v=${VIDEO_ID}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to load captions')
+      setCaptions(data.segments as CaptionSegment[])
+      toast.success(`Loaded ${data.segments.length} caption segments`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Unknown error'
+      setCaptionError(msg)
+      toast.error(`Caption load failed: ${msg}`)
+    } finally {
+      setCaptionLoading(false)
+    }
+  }, [])
+
+  /* ── Toggle handler ──────────────────────────────────────────── */
+  const handleToggle = useCallback(
+    (enabled: boolean) => {
+      useAppStore.getState().setVideoCaptionMode(enabled)
+      if (enabled) {
+        setCurrentCaption('')
+        setTranscript([])
+        lastSentRef.current = ''
+        fetchCaptions()
+      } else {
+        toast('Caption mode off')
+      }
+    },
+    [fetchCaptions],
   )
 
-  const captionOverlay = useMemo(() => {
-    if (!displayText) return ''
-    const words = displayText.trim().split(/\s+/)
-    return words.slice(-12).join(' ')
-  }, [displayText])
+  /* ── Poll video time → find matching caption → send to Arduino ─ */
+  useEffect(() => {
+    if (!videoCaptionMode || !captions.length) {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      return
+    }
 
+    pollRef.current = setInterval(() => {
+      const t = currentTimeRef.current
+      if (t === 0) return
+
+      const seg = captions.find((c) => t >= c.start && t < c.start + c.dur)
+      if (!seg) return
+      if (seg.text === lastSentRef.current) return
+
+      lastSentRef.current = seg.text
+      setCurrentCaption(seg.text)
+
+      // Update windowText for BrailleDisplay
+      useAppStore.getState().setWindowText(seg.text)
+
+      // Accumulate transcript
+      setTranscript((prev) => [...prev, seg.text])
+
+      // Send directly to Arduino tactile device (no mic, no TTS)
+      if (arduinoConnected && autoVibrate) {
+        enqueue(seg.text)
+      }
+    }, 250)
+
+    return () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    }
+  }, [videoCaptionMode, captions, arduinoConnected, autoVibrate, enqueue])
+
+  /* ── Cleanup on unmount ──────────────────────────────────────── */
+  useEffect(() => {
+    return () => {
+      if (useAppStore.getState().videoCaptionMode) {
+        useAppStore.getState().setVideoCaptionMode(false)
+      }
+    }
+  }, [])
+
+  const hasCaption = currentCaption.length > 0
+
+  /* ── RENDER ──────────────────────────────────────────────────── */
   return (
     <div className="min-h-screen bg-[#050508] pt-24 pb-12 px-4">
       <div className="max-w-7xl mx-auto">
-        {/* Page header */}
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Badge variant="secondary" className="text-[10px]">
                 <Play className="h-2.5 w-2.5 mr-1 fill-current" /> Now Playing
               </Badge>
+              {videoCaptionMode && hasCaption && (
+                <Badge variant="live"><span className="mr-1">●</span> Captions → Tactile</Badge>
+              )}
             </div>
             <h1 className="text-2xl font-black text-white">{courseTitle}</h1>
             <p className="text-sm text-white/40 mt-0.5 max-w-xl">{courseMeta.description}</p>
@@ -84,40 +232,125 @@ function VideoPageInner() {
               <p className="text-xs text-white/30">Duration</p>
               <p className="text-sm font-semibold text-white">{courseMeta.duration}</p>
             </div>
-            {isListening && <Badge variant="live"><span className="mr-1">●</span> Captions Live</Badge>}
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
-          {/* Video + captions */}
           <div className="space-y-4">
-            {/* Video player card */}
+            {/* ── Video player ────────────────────────────────────── */}
             <div className="relative rounded-2xl border border-white/8 overflow-hidden bg-black aspect-video">
               <iframe
+                ref={iframeRef}
                 className="w-full h-full"
-                src="https://www.youtube.com/embed/Oe_h_M7Drec?controls=1&rel=0&modestbranding=1&color=white"
+                src={`https://www.youtube.com/embed/${VIDEO_ID}?enablejsapi=1&controls=1&rel=0&modestbranding=1`}
                 title={courseTitle}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />
 
-              {/* Caption overlay */}
+              {/* Caption overlay synced to video playback */}
+              <motion.div
+                initial={false}
+                animate={{
+                  opacity: videoCaptionMode && hasCaption ? 1 : 0,
+                  y: videoCaptionMode && hasCaption ? 0 : 8,
+                }}
+                transition={{ duration: 0.15 }}
+                className="absolute bottom-6 left-1/2 -translate-x-1/2 w-[92%] text-center pointer-events-none z-10"
+              >
+                <span className="inline-block rounded-xl bg-black/90 backdrop-blur-md border border-white/10 px-5 py-3 text-white font-medium text-base leading-snug max-w-2xl shadow-2xl">
+                  {currentCaption}
+                </span>
+              </motion.div>
+
+              {/* Live indicator badge on video */}
+              {videoCaptionMode && videoPlaying && (
+                <div className="absolute top-4 right-4 z-10 flex items-center gap-2 bg-black/70 backdrop-blur-sm rounded-full px-3 py-1.5 border border-green-500/30">
+                  <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                  <span className="text-[11px] text-green-400 font-medium">Captions → Tactile</span>
+                </div>
+              )}
+            </div>
+
+            {/* ── Caption Mode Toggle Card ─────────────────────── */}
+            <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 border transition-colors',
+                    videoCaptionMode
+                      ? 'bg-purple-600/20 border-purple-500/30'
+                      : 'bg-white/5 border-white/10',
+                  )}>
+                    <Subtitles className={cn('h-5 w-5', videoCaptionMode ? 'text-purple-400' : 'text-white/40')} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">Video Captions → Tactile</p>
+                    <p className="text-xs text-white/40">
+                      {videoCaptionMode
+                        ? 'YouTube captions are sent directly to the Braille/tactile device'
+                        : 'Toggle ON to extract video captions and output to tactile device'}
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  checked={videoCaptionMode}
+                  onCheckedChange={handleToggle}
+                  aria-label="Video Captions to Tactile"
+                />
+              </div>
+
+              {/* Status panel */}
               <AnimatePresence>
-                {captionOverlay && (
+                {videoCaptionMode && (
                   <motion.div
-                    key={captionOverlay}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute bottom-8 left-1/2 -translate-x-1/2 w-[90%] text-center"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="overflow-hidden"
                   >
-                    <span className="inline-block rounded-xl bg-black/85 backdrop-blur-sm border border-white/10 px-5 py-2.5 text-white font-medium text-base leading-snug max-w-2xl">
-                      {captionOverlay}
-                      {interimText && (
-                        <span className="text-white/50 italic"> {interimText.split(/\s+/).slice(-4).join(' ')}</span>
+                    <div className="flex items-center gap-2.5 mt-3 pt-3 border-t border-white/5">
+                      {captionLoading ? (
+                        <>
+                          <Loader2 className="h-4 w-4 text-purple-400 animate-spin" />
+                          <span className="text-xs font-medium text-purple-400">Loading captions from YouTube…</span>
+                        </>
+                      ) : captionError ? (
+                        <>
+                          <AlertCircle className="h-4 w-4 text-red-400" />
+                          <span className="text-xs font-medium text-red-400">{captionError}</span>
+                        </>
+                      ) : captions.length > 0 ? (
+                        <>
+                          <Radio className="h-4 w-4 text-green-400" />
+                          <span className="text-xs font-medium text-green-400">
+                            {captions.length} segments loaded — {videoPlaying ? 'playing' : 'play video to start'}
+                          </span>
+                          {videoPlaying && (
+                            <span className="ml-auto">
+                              <span className="inline-flex h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <MonitorPlay className="h-4 w-4 text-white/40" />
+                          <span className="text-xs font-medium text-white/40">Waiting…</span>
+                        </>
                       )}
-                    </span>
+                    </div>
+
+                    {!arduinoConnected && (
+                      <p className="text-xs text-amber-400/70 mt-2">
+                        Connect the Arduino in the panel on the right to output captions to the tactile device.
+                      </p>
+                    )}
+                    {arduinoConnected && !autoVibrate && (
+                      <p className="text-xs text-amber-400/70 mt-2">
+                        Enable &quot;Auto Vibrate&quot; in the Arduino panel to automatically send captions.
+                      </p>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -139,50 +372,18 @@ function VideoPageInner() {
               </div>
             </div>
 
-            {/* Mic controls for live captions */}
-            <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm px-5 py-4">
-              <div className="flex items-center gap-3">
-                <VoiceWaveform active={isListening} className="h-6" />
-                <div>
-                  <p className="text-sm font-medium text-white">Live Captions</p>
-                  <p className="text-xs text-white/40">
-                    {isListening ? 'Transcribing audio…' : 'Narrate out loud to generate captions'}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  {ttsEnabled ? (
-                    <Volume2 className="h-4 w-4 text-cyan-400" />
-                  ) : (
-                    <VolumeX className="h-4 w-4 text-white/30" />
-                  )}
-                  <Switch
-                    checked={ttsEnabled}
-                    onCheckedChange={(v) => useAppStore.getState().setTtsEnabled(v)}
-                    aria-label="TTS playback"
-                  />
-                </div>
-                {isListening ? (
-                  <Button size="sm" variant="destructive" onClick={() => { stopListening(); toast('Captions stopped') }}>
-                    <MicOff className="h-3.5 w-3.5" /> Stop
-                  </Button>
-                ) : (
-                  <Button size="sm" onClick={() => { startListening(); toast.success('Live captions started') }}>
-                    <Mic className="h-3.5 w-3.5" /> Start Captions
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Full transcript */}
-            {windowText && (
+            {/* Full transcript (built from caption segments as they appear) */}
+            {transcript.length > 0 && (
               <div className="rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm p-5">
-                <p className="text-xs text-white/30 mb-3 uppercase tracking-wider font-semibold">Transcript</p>
-                <p className="text-base text-white/70 leading-relaxed caption-text">{windowText}</p>
-                {interimText && (
-                  <p className="text-sm text-white/30 italic mt-1">{interimText}</p>
-                )}
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-xs text-white/30 uppercase tracking-wider font-semibold">Video Transcript</p>
+                  <Badge variant="secondary" className="text-[10px]">
+                    <Subtitles className="h-2.5 w-2.5 mr-1" /> From YouTube Captions
+                  </Badge>
+                </div>
+                <p className="text-base text-white/70 leading-relaxed">
+                  {transcript.join(' ')}
+                </p>
               </div>
             )}
           </div>

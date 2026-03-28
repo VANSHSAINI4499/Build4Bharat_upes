@@ -1,13 +1,15 @@
 export type AgentDestination =
   | 'home'
   | 'login'
+  | 'dashboard'
   | 'ai_course'
   | 'vision_assist'
   | 'live_captions';
 
 export const DESTINATION_PATHS: Record<AgentDestination, string> = {
   home: '/',
-  login: '/',
+  login: '/login',
+  dashboard: '/dashboard',
   ai_course: '/product',
   vision_assist: '/vision',
   live_captions: '/captions',
@@ -15,14 +17,11 @@ export const DESTINATION_PATHS: Record<AgentDestination, string> = {
 
 export function resolveDestination(destination: AgentDestination) {
   const path = DESTINATION_PATHS[destination];
-  const fallback = destination === 'login';
 
   return {
     path,
-    fallback,
-    message: fallback
-      ? 'Login is not available in this frontend-only build. Navigated to home.'
-      : `Navigated to ${destination}.`,
+    fallback: false,
+    message: `Navigated to ${destination}.`,
   };
 }
 
@@ -31,7 +30,9 @@ export function inferDestinationFromCommand(
 ): AgentDestination | null {
   const lower = command.toLowerCase().trim();
 
-  if (lower.includes('home') || lower.includes('dashboard')) return 'home';
+  if (lower.includes('home')) return 'home';
+  if (lower.includes('dashboard') || lower.includes('progress') || lower.includes('parent'))
+    return 'dashboard';
   if (lower.includes('caption')) return 'live_captions';
   if (lower.includes('vision') || lower.includes('camera'))
     return 'vision_assist';

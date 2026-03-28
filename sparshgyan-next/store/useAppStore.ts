@@ -27,6 +27,9 @@ interface AppState {
   readingMode: ReadingMode;
   ttsRate: number;
 
+  // ── Video Caption Mode ─────────────────────────────────────────────────────
+  videoCaptionMode: boolean;
+
   // ── Accessibility Score (AI-like indicator) ────────────────────────────────
   accessibilityScore: number;
 
@@ -49,6 +52,7 @@ interface AppState {
   setTtsEnabled: (v: boolean) => void;
   setReadingMode: (mode: ReadingMode) => void;
   setTtsRate: (rate: number) => void;
+  setVideoCaptionMode: (v: boolean) => void;
   clearCaptions: () => void;
 }
 
@@ -69,6 +73,7 @@ export const useAppStore = create<AppState>((set) => ({
   ttsEnabled: false,
   readingMode: 'medium',
   ttsRate: 1,
+  videoCaptionMode: false,
   accessibilityScore: 72,
 
   // Actions
@@ -90,5 +95,6 @@ export const useAppStore = create<AppState>((set) => ({
   setTtsEnabled: (v) => set({ ttsEnabled: v }),
   setReadingMode: (mode) => set({ readingMode: mode }),
   setTtsRate: (rate) => set({ ttsRate: Math.max(0.5, Math.min(2, rate)) }),
+  setVideoCaptionMode: (v) => set({ videoCaptionMode: v }),
   clearCaptions: () => set({ windowText: '', interimText: '' }),
 }));
