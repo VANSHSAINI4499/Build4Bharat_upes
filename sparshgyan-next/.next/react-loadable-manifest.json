@@ -1,4 +1,16 @@
 {
+  "app/(routes)/vision/page.tsx -> @teachablemachine/image": {
+    "id": "app/(routes)/vision/page.tsx -> @teachablemachine/image",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_teachablemachine_image_dist_index_js.js"
+    ]
+  },
+  "app/(routes)/vision/page.tsx -> @tensorflow/tfjs": {
+    "id": "app/(routes)/vision/page.tsx -> @tensorflow/tfjs",
+    "files": [
+      "static/chunks/_app-pages-browser_node_modules_tensorflow_tfjs_dist_tf_esm_js.js"
+    ]
+  },
   "components/sections/CtaSection.tsx -> @/components/3d/MiniCtaScene": {
     "id": "components/sections/CtaSection.tsx -> @/components/3d/MiniCtaScene",
     "files": [

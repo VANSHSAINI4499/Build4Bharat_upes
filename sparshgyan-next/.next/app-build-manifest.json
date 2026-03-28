@@ -1,20 +1,15 @@
 {
   "pages": {
-    "/page": [
+    "/(routes)/vision/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/(routes)/vision/page.js"
     ],
     "/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
-    ],
-    "/(routes)/vision/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(routes)/vision/page.js"
     ],
     "/(routes)/captions/page": [
       "static/chunks/webpack.js",
@@ -26,15 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(routes)/product/page.js"
     ],
-    "/(routes)/video/page": [
+    "/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(routes)/video/page.js"
-    ],
-    "/_not-found/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/page.js"
     ]
   }
 }
