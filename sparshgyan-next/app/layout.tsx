@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { Navbar } from '@/components/layout/Navbar'
 import { VoiceAssistant } from '@/components/layout/VoiceAssistant'
 import { ElevenLabsWidget } from '@/components/layout/ElevenLabsWidget'
+import { WelcomeAnnouncer } from '@/components/layout/WelcomeAnnouncer'
 import { Providers } from './providers'
 import './globals.css'
 
@@ -28,6 +29,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         <Providers>
+          <WelcomeAnnouncer />
           <Navbar />
           <main className="min-h-screen">{children}</main>
           <VoiceAssistant />
