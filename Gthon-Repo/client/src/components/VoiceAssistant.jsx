@@ -8,6 +8,18 @@ const READING_STYLE_PRESETS = {
     slow: { label: 'Slow', pauseMultiplier: 1.45, speechRate: 0.85 },
 };
 
+const matchesAny = (text, patterns) => {
+    return patterns.some((pattern) => pattern.test(text));
+};
+
+const normalizeCommand = (input) => {
+    return input
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
 const VoiceAssistant = () => {
     const navigate = useNavigate();
 
@@ -15,6 +27,10 @@ const VoiceAssistant = () => {
     const shouldKeepListeningRef = useRef(false);
     const navigationTimerRef = useRef(null);
     const readDelayTimerRef = useRef(null);
+    const recognitionRestartTimerRef = useRef(null);
+    const recognitionRetryCountRef = useRef(0);
+    const recognitionStartingRef = useRef(false);
+    const lastProcessedCommandRef = useRef({ text: '', at: 0 });
     const readerStateRef = useRef({
         sections: [],
         sectionIndex: 0,
@@ -30,6 +46,8 @@ const VoiceAssistant = () => {
     const [manualCommand, setManualCommand] = useState('');
     const [currentSectionLabel, setCurrentSectionLabel] = useState('');
     const [readingStyle, setReadingStyle] = useState('natural');
+    const [isExpanded, setIsExpanded] = useState(false);
+    const [isMicStarting, setIsMicStarting] = useState(false);
 
     const commandHints = useMemo(
         () => [
@@ -54,6 +72,43 @@ const VoiceAssistant = () => {
         setIsSpeaking(false);
         setCurrentSectionLabel('');
         setFeedback(message);
+    };
+
+    const resetRecognitionRetryState = () => {
+        recognitionRetryCountRef.current = 0;
+        if (recognitionRestartTimerRef.current) {
+            clearTimeout(recognitionRestartTimerRef.current);
+            recognitionRestartTimerRef.current = null;
+        }
+    };
+
+    const scheduleRecognitionRestart = (reason = 'Trying to reconnect microphone...') => {
+        if (!shouldKeepListeningRef.current || !recognitionRef.current) {
+            return;
+        }
+
+        if (recognitionRestartTimerRef.current) {
+            return;
+        }
+
+        const retryDelay = Math.min(1800, 250 * (recognitionRetryCountRef.current + 1));
+
+        recognitionRestartTimerRef.current = setTimeout(() => {
+            recognitionRestartTimerRef.current = null;
+            if (!shouldKeepListeningRef.current || !recognitionRef.current) {
+                return;
+            }
+
+            try {
+                recognitionStartingRef.current = true;
+                recognitionRef.current.start();
+                setFeedback(reason);
+            } catch {
+                recognitionStartingRef.current = false;
+                recognitionRetryCountRef.current += 1;
+                scheduleRecognitionRestart('Reconnecting microphone...');
+            }
+        }, retryDelay);
     };
 
     const speakAssistant = (message, onEnd) => {
@@ -206,20 +261,31 @@ const VoiceAssistant = () => {
     };
 
     const handleCommand = (rawText) => {
-        const text = rawText.toLowerCase().trim();
+        const text = normalizeCommand(rawText);
+
+        const now = Date.now();
+        const isDuplicate =
+            lastProcessedCommandRef.current.text === text
+            && now - lastProcessedCommandRef.current.at < 1400;
+
+        if (isDuplicate) {
+            return;
+        }
+
+        lastProcessedCommandRef.current = { text, at: now };
         setLastCommand(text);
 
-        if (text.includes('read this page') || text.includes('read page')) {
+        if (matchesAny(text, [/\bread( this)? page\b/, /\bread out\b/, /\bstart reading\b/])) {
             readPage();
             return;
         }
 
-        if (text.includes('stop reading')) {
+        if (matchesAny(text, [/\bstop reading\b/, /\bstop read\b/, /\bend reading\b/])) {
             stopReading('Stopped reading.');
             return;
         }
 
-        if (text.includes('pause reading')) {
+        if (matchesAny(text, [/\bpause reading\b/, /\bhold reading\b/, /\bwait reading\b/])) {
             if (readDelayTimerRef.current) {
                 clearTimeout(readDelayTimerRef.current);
                 readDelayTimerRef.current = null;
@@ -230,7 +296,7 @@ const VoiceAssistant = () => {
             return;
         }
 
-        if (text.includes('resume reading')) {
+        if (matchesAny(text, [/\bresume reading\b/, /\bcontinue reading\b/, /\bstart reading again\b/])) {
             if (window.speechSynthesis.paused) {
                 window.speechSynthesis.resume();
             } else if (!window.speechSynthesis.speaking) {
@@ -241,60 +307,69 @@ const VoiceAssistant = () => {
             return;
         }
 
-        if (text.includes('reading style compact')) {
+        if (matchesAny(text, [/\breading style compact\b/, /\bcompact mode\b/, /\bfast mode\b/])) {
             setReadingStyle('compact');
             setFeedback('Reading style set to Compact.');
             return;
         }
 
-        if (text.includes('reading style natural')) {
+        if (matchesAny(text, [/\breading style natural\b/, /\bnatural mode\b/, /\bnormal mode\b/])) {
             setReadingStyle('natural');
             setFeedback('Reading style set to Natural.');
             return;
         }
 
-        if (text.includes('reading style slow')) {
+        if (matchesAny(text, [/\breading style slow\b/, /\bslow mode\b/, /\bslow reading\b/])) {
             setReadingStyle('slow');
             setFeedback('Reading style set to Slow.');
             return;
         }
 
-        if (text.includes('next section')) {
+        if (matchesAny(text, [/\bnext section\b/, /\bskip section\b/, /\bgo to next\b/])) {
             moveToSection(1);
             return;
         }
 
-        if (text.includes('previous section') || text.includes('back section')) {
+        if (matchesAny(text, [/\bprevious section\b/, /\bback section\b/, /\bgo to previous\b/])) {
             moveToSection(-1);
             return;
         }
 
-        if (text.includes('go to ai course') || text.includes('open ai course')) {
+        if (matchesAny(text, [/\bgo to ai course\b/, /\bopen ai course\b/, /\btake me to ai course\b/, /\bshow ai course\b/])) {
             goToRoute('/product', 'AI course');
             return;
         }
 
-        if (text.includes('open vision assist') || text.includes('go to vision assist')) {
+        if (matchesAny(text, [/\bopen vision assist\b/, /\bgo to vision assist\b/, /\bvision mode\b/, /\bopen vision\b/])) {
             goToRoute('/vision', 'Vision Assist');
             return;
         }
 
-        if (text.includes('open captions') || text.includes('go to captions') || text.includes('open live captions')) {
+        if (matchesAny(text, [/\bopen captions\b/, /\bgo to captions\b/, /\bopen live captions\b/, /\bshow captions\b/])) {
             goToRoute('/captions', 'Live Captions');
             return;
         }
 
-        if (text.includes('go to home') || text.includes('open home')) {
+        if (matchesAny(text, [
+            /\bgo to home\b/,
+            /\bopen home\b/,
+            /\bgo to homepage\b/,
+            /\bgo back to home\b/,
+            /\bgo back to homepage\b/,
+            /\btake me home\b/,
+            /\bopen home page\b/,
+            /\breturn home\b/,
+        ])) {
             goToRoute('/new', 'home dashboard');
             return;
         }
 
-        if (text.includes('open login') || text.includes('go to login')) {
+        if (matchesAny(text, [/\bopen login\b/, /\bgo to login\b/, /\blogin page\b/, /\bgo to sign in\b/])) {
             goToRoute('/', 'login');
             return;
         }
 
-        if (text.includes('stop listening')) {
+        if (matchesAny(text, [/\bstop listening\b/, /\bstop mic\b/, /\bturn off mic\b/, /\bdisable listening\b/])) {
             shouldKeepListeningRef.current = false;
             setIsListening(false);
             speakAssistant('Okay, stopping voice listening.');
@@ -331,21 +406,64 @@ const VoiceAssistant = () => {
             handleCommand(transcript);
         };
 
+        recognition.onstart = () => {
+            recognitionStartingRef.current = false;
+            resetRecognitionRetryState();
+            setIsListening(true);
+            setIsMicStarting(false);
+            setFeedback('Listening... Speak a command now.');
+        };
+
         recognition.onerror = (event) => {
+            recognitionStartingRef.current = false;
+            setIsMicStarting(false);
+
+            // Keep the logical listening intent alive and attempt self-heal for transient errors.
+            if (shouldKeepListeningRef.current && (event.error === 'network' || event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'aborted')) {
+                setIsListening(true);
+                scheduleRecognitionRestart('Reconnecting microphone...');
+            } else {
+                setIsListening(false);
+            }
+
+            if (event.error === 'not-allowed') {
+                shouldKeepListeningRef.current = false;
+                setFeedback('Microphone permission denied. Please allow mic access in browser settings.');
+                return;
+            }
+
+            if (event.error === 'network') {
+                setFeedback('Speech recognition network error. Check internet and try again.');
+                return;
+            }
+
+            if (event.error === 'no-speech') {
+                setFeedback('No speech detected. Try speaking a little louder.');
+                return;
+            }
+
             setFeedback(`Voice error: ${event.error}`);
         };
 
         recognition.onend = () => {
             if (shouldKeepListeningRef.current) {
-                recognition.start();
+                if (!recognitionStartingRef.current) {
+                    scheduleRecognitionRestart('Reconnecting microphone...');
+                }
+                return;
             }
+
+            setIsListening(false);
+            setIsMicStarting(false);
         };
 
         recognitionRef.current = recognition;
 
         return () => {
             shouldKeepListeningRef.current = false;
+            recognitionStartingRef.current = false;
             recognition.stop();
+            resetRecognitionRetryState();
             if (navigationTimerRef.current) {
                 clearTimeout(navigationTimerRef.current);
             }
@@ -364,27 +482,69 @@ const VoiceAssistant = () => {
 
         if (isListening) {
             shouldKeepListeningRef.current = false;
+            recognitionStartingRef.current = false;
             recognitionRef.current.stop();
+            resetRecognitionRetryState();
             setIsListening(false);
+            setIsMicStarting(false);
             setFeedback('Voice listening stopped.');
             return;
         }
 
         const startListening = async () => {
             try {
+                if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+                    setFeedback('Microphone access requires HTTPS (or localhost).');
+                    return;
+                }
+
+                setIsMicStarting(true);
+                setFeedback('Requesting microphone permission...');
+
+                let preflightWarning = '';
+
                 if (navigator.mediaDevices?.getUserMedia) {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                    stream.getTracks().forEach((track) => track.stop());
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        stream.getTracks().forEach((track) => track.stop());
+                    } catch (probeError) {
+                        if (probeError?.name === 'NotAllowedError') {
+                            setIsMicStarting(false);
+                            setIsListening(false);
+                            setFeedback('Microphone permission denied. Please allow microphone access.');
+                            return;
+                        }
+
+                        // Do not fail here: some environments return false negatives on preflight.
+                        preflightWarning = 'Microphone pre-check failed, trying direct voice start...';
+                    }
                 }
 
                 shouldKeepListeningRef.current = true;
-                recognitionRef.current.start();
-                setIsListening(true);
-                setFeedback('Listening... Speak a command now.');
+                try {
+                    recognitionStartingRef.current = true;
+                    recognitionRef.current.start();
+                    if (preflightWarning) {
+                        setFeedback(preflightWarning);
+                    }
+                } catch (startError) {
+                    recognitionStartingRef.current = false;
+                    setIsMicStarting(false);
+                    setIsListening(false);
+                    const startMessage =
+                        startError?.name === 'NotAllowedError'
+                            ? 'Microphone permission denied. Please allow microphone access.'
+                            : 'Could not start voice recognition. Please check browser microphone permissions.';
+                    setFeedback(startMessage);
+                }
             } catch (error) {
+                setIsMicStarting(false);
+                setIsListening(false);
                 const message =
                     error?.name === 'NotAllowedError'
                         ? 'Microphone permission denied. Please allow microphone access.'
+                        : error?.name === 'NotFoundError'
+                            ? 'Microphone not available to this browser session. Check site permissions and selected input device.'
                         : 'Could not access microphone. Check browser permissions.';
                 setFeedback(message);
             }
@@ -406,16 +566,48 @@ const VoiceAssistant = () => {
 
     if (!isSupported) {
         return (
-            <div className="voice-assistant-panel" role="status">
-                <p className="voice-assistant-title">Voice Assistant</p>
-                <p className="voice-assistant-meta">Speech recognition is not supported in this browser.</p>
+            <div className="voice-assistant-shell skip-reading" data-no-read="true">
+                <button type="button" className="voice-assistant-pill" onClick={() => setIsExpanded((prev) => !prev)} aria-expanded={isExpanded}>
+                    Voice Assistant
+                </button>
+                {isExpanded ? (
+                    <div className="voice-assistant-panel" role="status">
+                        <div className="voice-assistant-header">
+                            <p className="voice-assistant-title">Voice Assistant</p>
+                            <button type="button" className="voice-assistant-minimize" onClick={() => setIsExpanded(false)} aria-label="Collapse voice assistant">
+                                Minimize
+                            </button>
+                        </div>
+                        <p className="voice-assistant-meta">Speech recognition is not supported in this browser.</p>
+                    </div>
+                ) : null}
             </div>
         );
     }
 
     return (
-        <div className="voice-assistant-panel skip-reading" data-no-read="true" aria-live="polite">
+        <div className="voice-assistant-shell skip-reading" data-no-read="true" aria-live="polite">
+            {!isExpanded ? (
+                <button
+                    type="button"
+                    className="voice-assistant-pill"
+                    onClick={() => setIsExpanded(true)}
+                    aria-expanded={isExpanded}
+                    aria-label="Open voice assistant"
+                >
+                    🎤 Voice Assistant
+                    {(isListening || isSpeaking) ? <span className="voice-assistant-pill-dot" aria-hidden="true" /> : null}
+                </button>
+            ) : null}
+
+            {isExpanded ? (
+            <div className="voice-assistant-panel">
+            <div className="voice-assistant-header">
             <p className="voice-assistant-title">Voice Assistant</p>
+            <button type="button" className="voice-assistant-minimize" onClick={() => setIsExpanded(false)} aria-label="Collapse voice assistant">
+                Minimize
+            </button>
+            </div>
             <p className="voice-assistant-meta" aria-live="polite" aria-atomic="true">
                 {isListening ? 'Listening...' : 'Tap mic to start'}
             </p>
@@ -448,8 +640,9 @@ const VoiceAssistant = () => {
                     type="button"
                     className={`voice-assistant-button voice-assistant-mic ${isListening ? 'active' : ''}`}
                     onClick={toggleListening}
+                    disabled={isMicStarting}
                 >
-                    {isListening ? 'Stop Mic' : 'Start Mic'}
+                    {isMicStarting ? 'Starting Mic...' : isListening ? 'Stop Mic' : 'Start Mic'}
                 </button>
                 <button
                     type="button"
@@ -498,6 +691,8 @@ const VoiceAssistant = () => {
                 ))}
                 <li>Reading style Slow</li>
             </ul>
+            </div>
+            ) : null}
         </div>
     );
 };

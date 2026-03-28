@@ -112,16 +112,70 @@ a:focus-visible {
 }
 
 .voice-assistant-panel {
-  position: fixed;
-  right: 20px;
-  bottom: 20px;
   width: min(340px, calc(100vw - 24px));
   background: linear-gradient(145deg, #ffffff 0%, #eef8ff 100%);
   border: 1px solid #d8e8f7;
   box-shadow: 0 14px 32px rgba(10, 34, 56, 0.2);
   border-radius: 14px;
-  z-index: 60;
   padding: 14px;
+}
+
+.voice-assistant-shell {
+  position: fixed;
+  right: 20px;
+  bottom: 190px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.voice-assistant-pill {
+  border: none;
+  background: linear-gradient(135deg, #2f6feb 0%, #2a5fe5 100%) !important;
+  color: #fff !important;
+  border-radius: 999px;
+  padding: 14px 20px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  min-width: 0;
+  width: auto;
+  max-width: 340px;
+  letter-spacing: 0.01em;
+}
+
+.voice-assistant-pill-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #7dffbe;
+  box-shadow: 0 0 0 5px rgba(125, 255, 190, 0.25);
+}
+
+.voice-assistant-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.voice-assistant-minimize {
+  border: 1px solid #bfd5e8;
+  border-radius: 999px;
+  background: #fff;
+  color: #18425f;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 5px 10px;
+  cursor: pointer;
 }
 
 .voice-assistant-title {
@@ -247,10 +301,18 @@ a:focus-visible {
 }
 
 @media (max-width: 640px) {
-  .voice-assistant-panel {
+  .voice-assistant-shell {
     right: 8px;
-    left: 8px;
-    bottom: 10px;
+    bottom: 168px;
+  }
+
+  .voice-assistant-pill {
+    min-width: 0;
+    max-width: calc(100vw - 16px);
+  }
+
+  .voice-assistant-panel {
     width: auto;
+    max-width: calc(100vw - 16px);
   }
 }
