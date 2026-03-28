@@ -5,6 +5,8 @@ Sparshgyan is an accessibility-first hackathon project designed to make digital 
 
 The repository contains three working parts:
 - A Next.js 14 (App Router) frontend with TypeScript and Tailwind CSS — rebuilt from the earlier React/Vite prototype.
+- Firebase Authentication (email/password) and Cloud Firestore for persistent user data.
+- A parental dashboard that fetches child progress data from Firestore in real time.
 - An Arduino sketch that maps letters A–Z to tactile 6-dot Braille vibration patterns over serial.
 - A Python virtual mouse module that uses computer vision (MediaPipe) to convert hand gestures into mouse events, exposed via a Flask API.
 
@@ -34,6 +36,7 @@ Tech stack:
 - Next.js 14.2.5 with App Router (server + client components)
 - React 18, TypeScript 5
 - Tailwind CSS 3, Framer Motion 11
+- Firebase 12 (Auth — email/password, Firestore — Cloud database)
 - Zustand 4 (global state)
 - Radix UI primitives, Lucide icons, Sonner toasts
 - Browser APIs: Web Speech Recognition, SpeechSynthesis, Web Serial, MediaDevices
@@ -47,6 +50,8 @@ Tech stack:
 | `/product` | `app/(routes)/product/page.tsx` | Accessible courses catalogue — three demo courses with difficulty badges, ratings, and tags. Arduino and Braille sidebars included. |
 | `/video` | `app/(routes)/video/page.tsx` | Video lessons page — YouTube embed with live caption overlay showing last 12 words of transcript. Arduino and Braille sidebars included. |
 | `/vision` | `app/(routes)/vision/page.tsx` | Webcam gesture page — live camera preview, `<GestureControl />` sidebar for starting/stopping the Python gesture service. |
+| `/login` | `app/(routes)/login/page.tsx` | Firebase email/password login & sign-up page. Redirects to `/dashboard` on success. Toggle between sign-in and sign-up modes. |
+| `/dashboard` | `app/(routes)/dashboard/page.tsx` | Parental dashboard — fetches child progress from Firestore. Animated bar chart (weekly activity), line chart (monthly progress), donut chart (session breakdown), skill proficiency bars, achievements grid, activity feed, and stat counters. Auto-seeds demo data on first login. |
 
 #### API Routes (Next.js proxy to Flask)
 
@@ -57,7 +62,8 @@ Tech stack:
 
 #### Global Layout (`app/layout.tsx`)
 Every page is wrapped in:
-- `<Navbar />` — fixed top navigation with active-link animation
+- `<Providers />` (`app/providers.tsx`) — client-side wrapper containing `<AuthProvider />`
+- `<Navbar />` — fixed top navigation with active-link animation. Auth-aware: shows "Parent Login" when logged out, "Dashboard" when logged in.
 - `<VoiceAssistant />` — floating bottom-right mic widget (hidden on `/captions`)
 - `<Toaster />` — Sonner dark-themed toast notifications
 - Next.js `Metadata` with Open Graph tags
@@ -89,9 +95,15 @@ Every page is wrapped in:
 - `useSerial.ts` — Wraps the Web Serial API. Connects to the Arduino at 9600 baud. `enqueue(text)`: splits text into words and pushes to an in-memory queue. `drainQueue()`: sends one character byte at a time with a **2000 ms delay** between each character matching the Arduino's vibration timing. Updates `vibrateProgress` in the store.
 - `useGesture.ts` — Calls the Next.js proxy endpoints (`/api/gesture/start` and `/api/gesture/stop`) to start/stop the Python gesture service. Updates `gestureStatus` (`starting` → `running` or `error`) and `gestureActive` in the Zustand store.
 
+#### Firebase & Auth (`lib/`)
+- `firebase.ts` — Firebase app initialisation singleton. Exports `auth` (Firebase Auth) and `db` (Firestore). Uses `getApps().length === 0` guard for Next.js SSR safety.
+- `auth-context.tsx` — React context provider for Firebase Auth. Provides `user`, `loading`, `signIn(email, password)`, `signUp(email, password)`, `signOut()`. Listens to `onAuthStateChanged`.
+- `firestore.ts` — Firestore types, read helpers, and seed function. See "Firestore Schema" section below.
+
 #### Utilities (`lib/`)
 - `braille.ts` — Pure utility. `brailleMap` lookup table for a–z, 0–9, and punctuation (`. , ! ? -`) → Unicode Braille characters. `toBraille(text)` lowercases input and maps each character.
 - `utils.ts` — `cn()` helper combining `clsx` + `tailwind-merge`.
+- `voiceRouting.ts` — Voice command routing map. Includes `dashboard` → `/dashboard` and `login` → `/login` destinations.
 
 #### Global State (`store/useAppStore.ts`)
 Single flat Zustand store. State domains:
@@ -193,17 +205,51 @@ Supported commands:
 | Next.js frontend ↔ Live Captions + Arduino Auto Vibrate | Integrated |
 | Next.js frontend ↔ Voice navigation | Integrated |
 | Next.js frontend ↔ Python gesture service (via API proxy) | Integrated |
-| Authentication / backend database | Not present |
+| Firebase Auth (email/password) | Integrated — login/signup at `/login`, auth context wraps all pages |
+| Firestore database ↔ Parent Dashboard | Integrated — auto-seed on first login, all data fetched from Firestore |
 
 ---
 
-## 5. How to Run the Project
+## 5. Firestore Schema
+
+Firebase project: `sparshgyan-upes` (asia-south2)
+
+All data lives under `parents/{uid}/` where `{uid}` is the Firebase Auth user ID.
+
+| Firestore Path | Document Type | Fields |
+|---|---|---|
+| `parents/{uid}/child/profile` | Single document | `name` (string), `age` (number), `grade` (string), `disabilities` (string[]) |
+| `parents/{uid}/progress/{courseId}` | One doc per course | `courseId`, `courseTitle`, `lessonsCompleted`, `totalLessons`, `quizScore`, `timeSpentMinutes`, `lastAccessed` (timestamp), `color`, `colorLight` |
+| `parents/{uid}/stats/weekly` | Single document | `totalMinutes`, `lessonsCompleted`, `avgQuizScore`, `brailleSessions`, `captionSessions`, `gestureSessions` |
+| `parents/{uid}/data/activity` | Single document | `items` — array of `{ type, description, timestamp }` |
+| `parents/{uid}/data/weeklyActivity` | Single document | `items` — array of `{ day, minutes }` |
+| `parents/{uid}/data/skills` | Single document | `items` — array of `{ skill, value, color }` |
+| `parents/{uid}/data/monthlyProgress` | Single document | `items` — array of `{ month, score }` |
+| `parents/{uid}/data/sessionBreakdown` | Single document | `items` — array of `{ label, value, color }` |
+| `parents/{uid}/data/achievements` | Single document | `items` — array of `{ emoji, label, unlocked }` |
+
+Bounded lists (activity, weekly activity, skills, monthly progress, session breakdown, achievements) are stored as arrays inside single documents — fewer Firestore reads, cleaner schema. Only courses use individual documents since each course is a distinct entity.
+
+`seedDemoData(uid)` in `lib/firestore.ts` writes all the above demo data for a user. The dashboard auto-seeds on first login if no data exists.
+
+`fetchDashboardData(uid)` reads all 9 paths in parallel with a 20-second timeout and returns a `DashboardData` object.
+
+---
+
+## 6. How to Run the Project
 
 ### A. Run the Next.js Frontend
 1. Open a terminal in `sparshgyan-next/`.
 2. Run `npm install`.
 3. Run `npm run dev`.
 4. Open `http://localhost:3000`.
+5. To use the dashboard: click "Parent Login" in the navbar, sign up with an email/password, and you'll be redirected to the dashboard. Demo data is seeded automatically on first login.
+
+### A1. Firebase Setup (already configured)
+- Firebase project: `sparshgyan-upes`
+- Auth: Email/Password provider enabled.
+- Firestore: Database created in `asia-south2` region, security rules set to test mode (`allow read, write: if true`).
+- Config is in `lib/firebase.ts` — no `.env` file needed, config is hardcoded for the hackathon.
 
 ### B. Run the Arduino Module
 1. Connect the Arduino board to your computer.
@@ -232,19 +278,21 @@ Note: Live Captions requires Chrome or Edge. The Web Speech API sends audio to G
 
 ---
 
-## 6. Known Limitations
+## 7. Known Limitations
 - Browser-based features (microphone, Web Serial, camera) require Chrome or Edge and explicit user permissions.
 - Live Captions requires an internet connection — audio is processed by Google's speech recognition servers.
 - The Visual Braille display (`BrailleDisplay`) is a Unicode reference only; hardware output requires the Arduino to be connected and Auto Vibrate enabled.
 - Course and video content is currently placeholder/demo data.
 - The video page embeds a static YouTube iframe; replace the video ID for actual course content.
 
+- Firestore security rules are set to test mode (allow all) for the hackathon. In production, rules should restrict access to authenticated users reading their own data.
+
 ---
 
-## 7. Future Improvement Ideas
+## 8. Future Improvement Ideas
 - Add an offline speech recognition option (e.g. Whisper.js via WebAssembly) so Live Captions works without internet.
 - Swap the YouTube placeholder on the video page with real course content or a self-hosted video player.
-- Add persistent course data and a real backend if user accounts or content management are needed.
+- Replace demo seed data with real student progress tracking and teacher-facing content management.
 - Add language selection to the Live Captions page for non-English speakers.
 - Extend Braille output to support Grade-2 Braille contractions.
 - Add haptic feedback for punctuation and numbers on the Arduino.

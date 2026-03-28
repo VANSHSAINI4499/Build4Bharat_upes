@@ -161,11 +161,11 @@ export default function CaptionsPage() {
                       <Mic className="h-7 w-7 text-white/20" />
                     </div>
                     <p className="text-white/25 text-base">
-                      {isListening ? 'Listening… speak now' : 'Press "Start Listening" to begin'}
+                      {isListening ? 'Listening… speak now' : 'Press Start Listening to begin'}
                     </p>
                     {!isListening && (
                       <p className="text-white/15 text-sm mt-2">
-                        Or say "open captions" from anywhere in the app
+                        Or say &quot;open captions&quot; from anywhere in the app
                       </p>
                     )}
                   </div>

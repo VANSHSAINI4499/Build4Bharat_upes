@@ -1,6 +1,0 @@
-{
-  "/(routes)/captions/page": "app/(routes)/captions/page.js",
-  "/(routes)/vision/page": "app/(routes)/vision/page.js",
-  "/(routes)/product/page": "app/(routes)/product/page.js",
-  "/page": "app/page.js"
-}

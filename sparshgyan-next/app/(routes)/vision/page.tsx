@@ -180,7 +180,7 @@ export default function VisionPage() {
       stopTeachableMachine();
       stopCamera();
     };
-  }, [startCamera, stopCamera]);
+  }, [startCamera, stopCamera, stopTeachableMachine]);
 
   return (
     <div className="min-h-screen bg-[#050508] pt-24 pb-12 px-4">
