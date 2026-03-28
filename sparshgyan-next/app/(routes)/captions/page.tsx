@@ -1,60 +1,73 @@
-'use client'
+'use client';
 
-import React, { useEffect, useRef, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Volume2, VolumeX, RefreshCw, AlignLeft, AlertCircle } from 'lucide-react'
-import { useAppStore } from '@/store/useAppStore'
-import { useSpeech } from '@/lib/hooks/useSpeech'
-import { useSerial } from '@/lib/hooks/useSerial'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { ArduinoPanel } from '@/components/accessibility/ArduinoPanel'
-import { BrailleDisplay } from '@/components/accessibility/BrailleDisplay'
-import { VoiceWaveform } from '@/components/magic/VoiceWaveform'
-import { cn } from '@/lib/utils'
-import { toast } from 'sonner'
+import React, { useEffect, useRef, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+  RefreshCw,
+  AlignLeft,
+  AlertCircle,
+} from 'lucide-react';
+import { useAppStore } from '@/store/useAppStore';
+import { useSpeech } from '@/lib/hooks/useSpeech';
+import { useSerial } from '@/lib/hooks/useSerial';
+import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { ArduinoPanel } from '@/components/accessibility/ArduinoPanel';
+import { BrailleDisplay } from '@/components/accessibility/BrailleDisplay';
+import { VoiceWaveform } from '@/components/magic/VoiceWaveform';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export default function CaptionsPage() {
-  const isListening = useAppStore((s) => s.isListening)
-  const windowText = useAppStore((s) => s.windowText)
-  const interimText = useAppStore((s) => s.interimText)
-  const statusMsg = useAppStore((s) => s.statusMsg)
-  const micError = useAppStore((s) => s.micError)
-  const autoScroll = useAppStore((s) => s.autoScroll)
-  const ttsEnabled = useAppStore((s) => s.ttsEnabled)
+  const isListening = useAppStore((s) => s.isListening);
+  const windowText = useAppStore((s) => s.windowText);
+  const interimText = useAppStore((s) => s.interimText);
+  const statusMsg = useAppStore((s) => s.statusMsg);
+  const micError = useAppStore((s) => s.micError);
+  const autoScroll = useAppStore((s) => s.autoScroll);
+  const ttsEnabled = useAppStore((s) => s.ttsEnabled);
 
-  const { startListening, stopListening, setEnqueue } = useSpeech()
-  const { enqueue } = useSerial()
+  const { startListening, stopListening, setEnqueue } = useSpeech();
+  const { enqueue } = useSerial();
 
   // Wire serial enqueue into speech hook
-  useEffect(() => { setEnqueue(enqueue) }, [enqueue, setEnqueue])
+  useEffect(() => {
+    setEnqueue(enqueue);
+  }, [enqueue, setEnqueue]);
 
   // Combined caption text for display
   const allText = useMemo(() => {
-    if (!interimText) return windowText
-    return windowText ? `${windowText} ${interimText}` : interimText
-  }, [windowText, interimText])
+    if (!interimText) return windowText;
+    return windowText ? `${windowText} ${interimText}` : interimText;
+  }, [windowText, interimText]);
 
   // Auto-scroll
-  const captionEndRef = useRef<HTMLDivElement>(null)
-  const scrollRafRef = useRef<number>(0)
+  const captionEndRef = useRef<HTMLDivElement>(null);
+  const scrollRafRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!autoScroll) return
-    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+    if (!autoScroll) return;
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
     scrollRafRef.current = requestAnimationFrame(() => {
-      captionEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-      scrollRafRef.current = 0
-    })
-  }, [allText, autoScroll])
+      captionEndRef.current?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'end',
+      });
+      scrollRafRef.current = 0;
+    });
+  }, [allText, autoScroll]);
 
   const clearCaptions = () => {
-    useAppStore.getState().setWindowText('')
-    useAppStore.getState().setInterimText('')
-  }
+    useAppStore.getState().setWindowText('');
+    useAppStore.getState().setInterimText('');
+  };
 
-  const wordCount = windowText.trim().split(/\s+/).filter(Boolean).length
+  const wordCount = windowText.trim().split(/\s+/).filter(Boolean).length;
 
   return (
     <div className="min-h-screen bg-[#050508] pt-24 pb-12 px-4">
@@ -87,12 +100,25 @@ export default function CaptionsPage() {
               Clear
             </Button>
             {isListening ? (
-              <Button variant="destructive" onClick={() => { stopListening(); toast('Microphone stopped') }} size="lg">
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  stopListening();
+                  toast('Microphone stopped');
+                }}
+                size="lg"
+              >
                 <MicOff className="h-4 w-4" />
                 Stop Listening
               </Button>
             ) : (
-              <Button onClick={() => { startListening(); toast.success('Starting microphone…') }} size="lg">
+              <Button
+                onClick={() => {
+                  startListening();
+                  toast.success('Starting microphone…');
+                }}
+                size="lg"
+              >
                 <Mic className="h-4 w-4" />
                 Start Listening
               </Button>
@@ -107,10 +133,12 @@ export default function CaptionsPage() {
             <div className="flex items-center justify-between rounded-2xl border border-white/8 bg-white/3 backdrop-blur-sm px-5 py-3">
               <div className="flex items-center gap-3">
                 <VoiceWaveform active={isListening} className="h-6" />
-                <span className={cn(
-                  'text-sm font-medium',
-                  isListening ? 'text-green-400' : 'text-white/40'
-                )}>
+                <span
+                  className={cn(
+                    'text-sm font-medium',
+                    isListening ? 'text-green-400' : 'text-white/40',
+                  )}
+                >
                   {statusMsg}
                 </span>
               </div>
@@ -141,7 +169,11 @@ export default function CaptionsPage() {
               {/* Top fade */}
               <div className="absolute top-0 left-0 right-0 h-8 bg-gradient-to-b from-[#050508]/80 to-transparent pointer-events-none z-10" />
 
-              <div className="absolute inset-0 overflow-y-auto px-8 py-8 caption-text" aria-live="polite" aria-atomic="false">
+              <div
+                className="absolute inset-0 overflow-y-auto px-8 py-8 caption-text"
+                aria-live="polite"
+                aria-atomic="false"
+              >
                 {allText ? (
                   <>
                     {/* Final text */}
@@ -161,11 +193,14 @@ export default function CaptionsPage() {
                       <Mic className="h-7 w-7 text-white/20" />
                     </div>
                     <p className="text-white/25 text-base">
-                      {isListening ? 'Listening… speak now' : 'Press Start Listening to begin'}
+                      {isListening
+                        ? 'Listening… speak now'
+                        : 'Press Start Listening to begin'}
                     </p>
                     {!isListening && (
                       <p className="text-white/15 text-sm mt-2">
-                        Or say &quot;open captions&quot; from anywhere in the app
+                        Or say &quot;open captions&quot; from anywhere in the
+                        app
                       </p>
                     )}
                   </div>
@@ -184,14 +219,16 @@ export default function CaptionsPage() {
                   icon: autoScroll ? AlignLeft : AlignLeft,
                   label: 'Auto-scroll',
                   checked: autoScroll,
-                  onChange: (v: boolean) => useAppStore.getState().setAutoScroll(v),
+                  onChange: (v: boolean) =>
+                    useAppStore.getState().setAutoScroll(v),
                   color: 'text-blue-400',
                 },
                 {
                   icon: ttsEnabled ? Volume2 : VolumeX,
                   label: 'TTS Playback',
                   checked: ttsEnabled,
-                  onChange: (v: boolean) => useAppStore.getState().setTtsEnabled(v),
+                  onChange: (v: boolean) =>
+                    useAppStore.getState().setTtsEnabled(v),
                   color: 'text-cyan-400',
                 },
               ].map(({ label, checked, onChange, color, icon: Icon }) => (
@@ -217,5 +254,5 @@ export default function CaptionsPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
