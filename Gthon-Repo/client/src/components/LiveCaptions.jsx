@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Braille map (reused from Subtitles.jsx logic) ────────────────────────────
@@ -16,9 +16,12 @@ const toBraille = (text) =>
     .map((ch) => brailleMap[ch] ?? ch)
     .join('');
 
-// Max phrases kept in the DOM at once. Older phrases are dropped from state
-// (not cached anywhere) so the list never accumulates memory over time.
-const MAX_VISIBLE = 20;
+// Only the most recent 30 words are kept in state at any time.
+// Anything older is discarded immediately — nothing is cached.
+const MAX_WORDS = 30;
+
+// Arduino timing: 6 dots × (150+100)ms + 500ms gap ≈ 2000 ms per character
+const CHAR_DELAY_MS = 2000;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const LiveCaptions = () => {
@@ -26,7 +29,7 @@ const LiveCaptions = () => {
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [isListening, setIsListening] = useState(false);
-  const [captions, setCaptions] = useState([]);       // Array of { id, text, isFinal }
+  const [windowText, setWindowText] = useState(''); // Rolling 30-word string, old words dropped
   const [interimText, setInterimText] = useState(''); // Current interim transcript
   const [statusMsg, setStatusMsg] = useState('Ready');
   const [micError, setMicError] = useState('');
@@ -35,17 +38,97 @@ const LiveCaptions = () => {
   const [showBraille, setShowBraille] = useState(false);
   const [ttsEnabled, setTtsEnabled] = useState(false);
 
+  // ── Arduino / tactile device state ────────────────────────────────────────
+  const [arduinoConnected, setArduinoConnected] = useState(false);
+  const [autoVibrate, setAutoVibrate] = useState(false); // auto-send captions to Arduino
+  const [vibrateProgress, setVibrateProgress] = useState('');
+
   // ── Refs ───────────────────────────────────────────────────────────────────
   const recognitionRef = useRef(null);       // SpeechRecognition instance
   const shouldListenRef = useRef(false);     // Controls auto-restart
   const captionEndRef = useRef(null);        // Scroll anchor
   const videoRef = useRef(null);             // Camera preview element
   const cameraStreamRef = useRef(null);      // MediaStream for cleanup
-  const captionIdRef = useRef(0);            // Monotonically increasing caption IDs
   const networkRetryRef = useRef(0);         // Consecutive network-error counter
   const retryTimerRef = useRef(null);        // setTimeout handle for network retry
   const rafRef = useRef(null);              // RAF handle — throttles interim setState
   const scrollRafRef = useRef(null);        // RAF handle — throttles auto-scroll
+  const portRef = useRef(null);             // Web Serial port handle
+  const vibrateQueueRef = useRef([]);       // Words waiting to be vibrated
+  const vibratingRef = useRef(false);       // Guard: only one send loop at a time
+  const autoVibrateRef = useRef(false);     // Ref mirror of autoVibrate (for use inside closures)
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Arduino helpers — Web Serial send + word queue drain
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Send one character over the serial port
+  const sendChar = async (char) => {
+    if (!portRef.current) return;
+    const encoder = new TextEncoder();
+    const writer = portRef.current.writable.getWriter();
+    try { await writer.write(encoder.encode(char)); }
+    finally { writer.releaseLock(); }
+  };
+
+  // Drain the queue word-by-word, letter-by-letter.
+  // Runs as a single async loop so the Arduino is never flooded.
+  const drainVibrateQueue = async () => {
+    if (vibratingRef.current) return; // already running
+    vibratingRef.current = true;
+    while (vibrateQueueRef.current.length > 0) {
+      const word = vibrateQueueRef.current.shift();
+      const letters = word.toUpperCase().replace(/[^A-Z]/g, '');
+      for (let i = 0; i < letters.length; i++) {
+        if (!portRef.current) break; // disconnected mid-send
+        setVibrateProgress(`📳 ${letters[i]} (${i + 1}/${letters.length}) — "${word}"`);
+        await sendChar(letters[i]);
+        await new Promise((r) => setTimeout(r, CHAR_DELAY_MS));
+      }
+    }
+    setVibrateProgress('');
+    vibratingRef.current = false;
+  };
+
+  // Add text to the vibration queue and start draining
+  const enqueueForVibration = (text) => {
+    if (!portRef.current) return;
+    vibrateQueueRef.current.push(...text.trim().split(/\s+/).filter(Boolean));
+    drainVibrateQueue();
+  };
+
+  const connectArduino = async () => {
+    if (!('serial' in navigator)) {
+      alert('Web Serial API not supported. Use Chrome or Edge.');
+      return;
+    }
+    try {
+      const port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 9600 });
+      portRef.current = port;
+      setArduinoConnected(true);
+    } catch { /* user cancelled the port picker */ }
+  };
+
+  const disconnectArduino = async () => {
+    vibrateQueueRef.current = [];
+    if (portRef.current) {
+      try { await portRef.current.close(); } catch { /* ignore */ }
+      portRef.current = null;
+    }
+    setArduinoConnected(false);
+    setVibrateProgress('');
+    autoVibrateRef.current = false;
+    setAutoVibrate(false);
+  };
+
+  // Keep ref in sync with state so the recognition closure always sees the latest value
+  const toggleAutoVibrate = () => {
+    setAutoVibrate((v) => { autoVibrateRef.current = !v; return !v; });
+  };
+
+  // Cleanup serial on component unmount
+  useEffect(() => () => { disconnectArduino(); }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Camera setup — request video stream and bind it to the <video> element
@@ -110,18 +193,22 @@ const LiveCaptions = () => {
             window.speechSynthesis.speak(utt);
           }
 
-          // Cap visible captions at MAX_VISIBLE to prevent unbounded DOM growth.
-          // Phrases beyond the cap are simply removed from state — they are NOT
-          // cached or stored anywhere, so memory stays flat no matter how long
-          // the session runs.
-          setCaptions((prev) => {
-            const next = [
-              ...prev,
-              { id: ++captionIdRef.current, text: finalText, isFinal: true },
+          // Merge new words into the rolling window.
+          // Split both old and new text into words, keep only the last MAX_WORDS.
+          // Old words are dropped immediately — nothing accumulates in memory.
+          setWindowText((prev) => {
+            const words = [
+              ...prev.split(/\s+/).filter(Boolean),
+              ...finalText.split(/\s+/).filter(Boolean),
             ];
-            return next.length > MAX_VISIBLE ? next.slice(next.length - MAX_VISIBLE) : next;
+            return words.slice(-MAX_WORDS).join(' ');
           });
           setInterimText('');
+
+          // Auto-vibrate: send each finalised phrase to the Arduino as it arrives
+          if (autoVibrateRef.current && portRef.current) {
+            enqueueForVibration(finalText);
+          }
         } else {
           // Interim phrase — accumulated and shown live below the caption list
           interim += transcript;
@@ -216,7 +303,7 @@ const LiveCaptions = () => {
       captionEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       scrollRafRef.current = null;
     });
-  }, [captions, interimText, autoScroll]);
+  }, [windowText, interimText, autoScroll]);
 
   // Cancel pending scroll RAF on unmount
   useEffect(() => () => {
@@ -274,17 +361,12 @@ const LiveCaptions = () => {
   };
 
   const clearCaptions = () => {
-    setCaptions([]);
+    setWindowText('');
     setInterimText('');
   };
 
-  // Full caption text (finals only) joined for Braille/stats.
-  // useMemo ensures this does NOT recompute on every rapid interim re-render —
-  // it only reruns when the finalised captions array actually changes.
-  const allCaptionText = useMemo(
-    () => captions.map((c) => c.text).join(' '),
-    [captions],
-  );
+  // windowText is already the exact string we need — no mapping or joining required.
+  const allCaptionText = windowText;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Unsupported browser fallback
@@ -409,6 +491,52 @@ const LiveCaptions = () => {
             />
           </div>
 
+          {/* ── Arduino tactile device panel ──────────────────────────── */}
+          <div className="bg-gray-900 rounded-xl p-4 border border-gray-700 flex flex-col gap-3">
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Tactile Device</p>
+
+            {!arduinoConnected ? (
+              <button
+                onClick={connectArduino}
+                className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm transition"
+              >
+                🔌 Connect Arduino
+              </button>
+            ) : (
+              <>
+                <p className="text-green-400 text-xs font-semibold">🟢 Arduino Connected</p>
+
+                {/* Auto-send every caption to the Arduino as it finalises */}
+                <ToggleRow
+                  label="Auto Vibrate (live)"
+                  checked={autoVibrate}
+                  onChange={toggleAutoVibrate}
+                />
+
+                {/* Manual one-shot send */}
+                <button
+                  onClick={() => { if (windowText) enqueueForVibration(windowText); }}
+                  disabled={!windowText}
+                  className="w-full py-2 rounded-lg bg-[#20B486] hover:bg-green-600 text-white font-bold text-sm transition disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed"
+                >
+                  📳 Send Captions Now
+                </button>
+
+                {/* Live vibration progress */}
+                {vibrateProgress && (
+                  <p className="text-blue-400 text-xs font-medium animate-pulse">{vibrateProgress}</p>
+                )}
+
+                <button
+                  onClick={disconnectArduino}
+                  className="w-full py-1 rounded-lg bg-red-900 hover:bg-red-800 text-red-300 text-xs transition"
+                >
+                  Disconnect
+                </button>
+              </>
+            )}
+          </div>
+
           {/* Mic error */}
           {micError && (
             <div
@@ -430,21 +558,18 @@ const LiveCaptions = () => {
             aria-live="off"
             aria-label="Live caption output"
           >
-            {captions.length === 0 && !interimText ? (
+            {!windowText && !interimText ? (
               <p className="text-gray-600 text-xl text-center mt-10 select-none">
                 Captions will appear here once you start listening…
               </p>
             ) : (
               <>
-                {/* Finalised captions */}
-                {captions.map((caption) => (
-                  <p
-                    key={caption.id}
-                    className="text-white text-2xl md:text-3xl font-semibold leading-relaxed mb-2"
-                  >
-                    {caption.text}
+                {/* Rolling 30-word window — single element, no list */}
+                {windowText && (
+                  <p className="text-white text-2xl md:text-3xl font-semibold leading-relaxed mb-2">
+                    {windowText}
                   </p>
-                ))}
+                )}
 
                 {/* Live interim text */}
                 {interimText && (
@@ -473,9 +598,7 @@ const LiveCaptions = () => {
 
           {/* Caption stats */}
           <div className="flex gap-4 text-sm text-gray-500">
-            <span>{captions.length} phrase{captions.length !== 1 ? 's' : ''} captured</span>
-            <span>·</span>
-            <span>{allCaptionText.split(/\s+/).filter(Boolean).length} words</span>
+            <span>{allCaptionText.split(/\s+/).filter(Boolean).length} / {MAX_WORDS} words</span>
           </div>
         </section>
       </main>
