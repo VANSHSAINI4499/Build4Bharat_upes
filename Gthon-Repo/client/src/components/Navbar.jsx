@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { logo, lock, hamburgerMenu, close } from '../assets'
 
 const Navbar = () => {
 
     const [toggle, setToggle] = useState(false);
+    const navigate = useNavigate();
 
     const handleClick = () => setToggle(!toggle);
 
@@ -19,6 +21,14 @@ const Navbar = () => {
                         <li>Support</li>
                         <li>Platform</li>
                         <li>Pricing</li>
+                        <li>
+                            <button
+                                onClick={() => navigate('/captions')}
+                                className='text-[#20B486] font-semibold hover:underline'
+                            >
+                                Live Captions
+                            </button>
+                        </li>
                     </ul>
                 </div>
 
@@ -50,6 +60,12 @@ const Navbar = () => {
                     <li className='p-4 hover:bg-gray-100'>Support</li>
                     <li className='p-4 hover:bg-gray-100'>Platform</li>
                     <li className='p-4 hover:bg-gray-100'>Pricing</li>
+                    <li
+                        className='p-4 text-[#20B486] font-semibold hover:bg-gray-100 cursor-pointer'
+                        onClick={() => navigate('/captions')}
+                    >
+                        Live Captions
+                    </li>
                     <div className='flex flex-col my-4 gap-4'>
                         <button type="button" className='border border-[20B486] flex justify-center items-center  bg-transparent  px-6 gap-2 py-4' aria-label="Explore available content">
                             <img src={lock} alt="" aria-hidden="true" />

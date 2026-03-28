@@ -1,47 +1,156 @@
-    # Sparshgyan: Hackathon Project Documentation
+# Sparshgyan: Project Documentation
 
 ## 1. Project Overview
-**Sparshgyan** is an accessibility-focused application designed to bridge the gap between digital content and physical touch, primarily targeting the Deaf and Deaf-Blind communities. The project consists of two major components:
-- A full-stack web application for user management, course discovery, and learning.
-- A hardware prototype (using Arduino) that translates digital text into physical vibrotactile feedback (Braille/Morse via a vibration motor).
+Sparshgyan is an accessibility-focused hackathon project that combines a learning interface with assistive interaction modes for users with visual, hearing, and motor accessibility needs.
 
-## 2. Directory Structure & Architecture
-The project is organized into two main workspaces:
+The repository currently contains three working parts:
+- A React + Vite frontend for the learning experience and accessibility controls.
+- An Arduino sketch that converts typed letters into tactile vibration patterns based on Braille dot mappings.
+- A Python virtual mouse module that uses hand tracking for gesture-based control.
 
-### A. Arduino Hardware (`AdrinoCodes/`)
-- `bil369.ino`: The C++ code uploaded to an Arduino Uno R3. It establishes serial communication with a computer, listens for English letters (A-Z), maps them to a digital representation of a 6-dot Braille standard, and pulses a DC Vibration Motor on Digital Pin 9 using PWM to allow users to physically "feel" the letter.
+The overall idea is to let users interact with educational content through multiple access modes: voice guidance, on-screen Braille-like subtitles, gesture navigation, and tactile output.
 
-### B. Full-Stack Web Application (`Gthon-Repo/`)
-Built with the MERN/PERN stack philosophy (MongoDB, Express, React, Node.js).
+## 2. Repository Structure
 
-#### Frontend (`client/`)
-Built with React, Vite, and styled with plain CSS and Tailwind.
-- `App.jsx`: The main router controlling navigation (`/` Signup/Login, `/new` Landing Dashboard, `/product` Product Details, `/video` Video page).
-- `Signup.jsx`: Handles user registration and authentication via an animated flip form. Communicates with the backend using Axios.
-- `New.jsx`: The main landing dashboard composed of multiple smaller components (Hero, Companies, Courses, Achievement, Categories, Feedback, CTA, Footer).
-- `Productdetails.jsx`: Displays mock course details, including pricing, variants, and a "Watch Video Now" route mechanism.
-- `Subtitles.jsx`: A unique accessibility component that animates standard text into visual Braille dots on the screen.
+### A. Frontend Web Application (`Gthon-Repo/client/`)
+This is a React application built with Vite.
 
-#### Backend (`server/`)
-Built with Node.js and Express.js, connecting to MongoDB Atlas.
-- `index.js & app.js`: The entry points that configure the server, apply CORS, mount the database, and define the base routing (`/api/v1`).
-- `Controllers/userController.js`: Contains business logic for `/register` (hashing passwords with bcrypt) and `/login` (comparing passwords and authorizing access).
-- `Models/userModels.js`: Defines the Mongoose schema mapping for User data in the database.
-- `.env`: Stores sensitive environment variables like the port and the cloud MongoDB Atlas connection string.
+Important files:
+- `src/App.jsx`: Defines the client routes and mounts the global voice assistant.
+- `src/components/New.jsx`: Main landing/dashboard page that assembles the homepage sections.
+- `src/components/Productdetails.jsx`: Displays a sample course/product page and embeds the Braille subtitle panel.
+- `src/components/Video.jsx`: Shows a sample learning video page with related content and subtitles.
+- `src/components/VisionAssist.jsx`: Dedicated vision-assist screen for hands-free interaction messaging.
+- `src/components/VoiceAssistant.jsx`: Adds speech recognition, speech synthesis, and voice-based navigation commands.
+- `src/components/AccessibilityControls.jsx`: Contains controls for Arduino connection via Web Serial and a local gesture toggle button.
+- `src/components/Subtitles.jsx`: Animates sample text into Braille Unicode characters for visual accessibility.
 
-## 3. How the Features Work Together
-1. **User Onboarding:** A user visits the React frontend and registers an account. The credentials are encrypted and stored in MongoDB Atlas via the Express backend.
-2. **Platform Access:** Upon successful login, the user is navigated to the educational dashboard (`/new`), where they can browse courses and navigate to individual product pages (`/product`).
-3. **Accessibility Translation:** On the platform, visual elements (like `Subtitles.jsx`) act as a visual manifestation of Braille.
-4. **Physical Haptic Feedback:** Independently, the Arduino module receives text signals and physically vibrates. (In a future merged state, the React app could use the Web Serial API to send text directly from the frontend to the Arduino, creating a fully integrated deaf-blind friendly learning environment).
+Frontend routes:
+- `/` and `/new`: Main dashboard
+- `/product`: Product/course details page
+- `/video`: Video learning page
+- `/vision`: Vision Assist page
 
-## 4. Environment Setup (How to Run)
-**Hardware:**
-1. Connect Arduino Uno to PC.
-2. Connect DC Vibration motor (VCC->5V, GND->GND, IN->Pin9).
-3. Upload `bil369.ino` and type letters into the Serial Monitor at 9600 baud.
+Tech stack:
+- React 18
+- Vite
+- React Router
+- Tailwind CSS + custom CSS
+- Browser APIs: Speech Recognition, Speech Synthesis, Web Serial
 
-**Software:**
-1. **Backend:** Navigate to `server/`, run `npm install`, ensure the MongoDB Atlas URI is in `.env`, then run `npm run dev`.
-2. **Frontend:** Navigate to `client/`, run `npm install`, then run `npm run dev`.
-3. Open `http://localhost:5173` in a browser.
+### B. Arduino Tactile Output (`AdrinoCodes/bil369/bil369.ino`)
+This sketch runs on an Arduino and maps letters `A-Z` to 6-dot Braille patterns.
+
+How it works:
+- Serial input is read at `9600` baud.
+- Each valid alphabet character is converted to a predefined Braille dot array.
+- A vibration motor attached to PWM pin `9` is pulsed to represent active Braille dots.
+- Inactive dots are represented by timing gaps, allowing the user to feel the pattern sequentially.
+
+This module is intended to provide physical tactile feedback for typed text.
+
+### C. Python Gesture / Virtual Mouse (`virtual-Mouse/`)
+This module provides gesture-based mouse control using computer vision.
+
+Important files:
+- `app.py`: Flask API for starting and stopping the gesture mouse script as a separate process.
+- `virtualmouse.py`: Uses OpenCV, MediaPipe, PyAutoGUI, and Pynput to detect hand gestures and convert them into mouse actions.
+- `util.py`: Helper math functions used for gesture calculations.
+- `requirements.txt`: Python dependencies.
+
+Supported gesture actions in the current script:
+- Cursor movement
+- Left click
+- Right click
+- Screenshot capture
+
+Note:
+- The React frontend currently only toggles a local gesture state in `AccessibilityControls.jsx`.
+- It does not yet call the Flask endpoints in `virtual-Mouse/app.py`.
+- That means the UI and the Python gesture service are present in the repo, but not fully wired together yet.
+
+## 3. Feature Flow
+
+### Voice Assistance
+`VoiceAssistant.jsx` is rendered globally, so it remains available across the app.
+
+Current supported commands include:
+- `Read this page`
+- `Stop reading`
+- `Go to AI course`
+- `Open vision assist`
+- `Go to home`
+- `Stop listening`
+
+The component uses:
+- Speech recognition for command input
+- Speech synthesis for spoken feedback
+- React Router navigation for moving between pages
+
+### Visual Braille Output
+`Subtitles.jsx` converts sample text into Braille Unicode characters and reveals them progressively on screen.
+
+This creates a visual accessibility layer that complements the tactile Arduino module.
+
+### Tactile Device Output
+`AccessibilityControls.jsx` can connect to an Arduino through the browser Web Serial API.
+
+When connected:
+- The user enters a word or sentence.
+- Non-alphabetic characters are filtered out.
+- Letters are sent one by one to the Arduino.
+- A `2000 ms` delay is used between letters so the hardware has time to finish vibrating each character pattern.
+
+### Gesture Control
+The repository includes a separate Python-based gesture mouse system. It is designed to support hands-free interaction, especially for users who may have difficulty with a conventional mouse.
+
+At the moment:
+- The Python gesture engine exists and can run independently.
+- The frontend button changes UI state only.
+- Full frontend-to-Flask integration is a future enhancement.
+
+## 4. Current Architecture Summary
+This project is currently best understood as a multi-module prototype rather than a single fully integrated production system.
+
+Present integration status:
+- Frontend and Arduino connection: partially integrated through Web Serial in the browser.
+- Frontend and voice assistant: integrated in the React app.
+- Frontend and Python virtual mouse: not yet integrated through API calls.
+- Backend database/authentication layer: not present in the current repository.
+
+## 5. How to Run the Project
+
+### A. Run the React Frontend
+1. Open a terminal in `Build4Bharat_upes/Gthon-Repo/client`.
+2. Run `npm install`.
+3. Run `npm run dev`.
+4. Open the local Vite URL shown in the terminal, usually `http://localhost:5173`.
+
+### B. Run the Arduino Module
+1. Connect the Arduino board to your computer.
+2. Connect the vibration motor to the Arduino circuit as required by your hardware setup.
+3. Open `AdrinoCodes/bil369/bil369.ino` in the Arduino IDE.
+4. Upload the sketch.
+5. Open the Serial Monitor and use baud rate `9600`.
+6. Type letters `A-Z` to test tactile output.
+
+### C. Run the Python Virtual Mouse Service
+1. Open a terminal in `Build4Bharat_upes/virtual-Mouse`.
+2. Install dependencies with `pip install -r requirements.txt`.
+3. Start the Flask API with `python app.py`.
+4. The service runs on `http://localhost:5000`.
+
+If needed, the gesture engine can also be run directly through `virtualmouse.py`.
+
+## 6. Known Limitations
+- The documentation previously referenced a backend authentication system, but that system is not part of the current repo.
+- The gesture toggle in the frontend does not yet start or stop the Flask virtual mouse service.
+- Some displayed course and video content is placeholder/demo content.
+- Browser-based features such as microphone access and Web Serial require user permission and compatible browsers.
+
+## 7. Future Improvement Ideas
+- Connect the React accessibility controls directly to the Flask gesture API.
+- Replace sample text in `Subtitles.jsx` with live subtitles or lesson text.
+- Send lesson/video text directly to the Arduino tactile module in real time.
+- Add persistent course data and a real backend if authentication or content management is needed.
+- Improve error handling and device status feedback across all accessibility modules.
