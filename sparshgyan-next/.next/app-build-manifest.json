@@ -21,15 +21,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(routes)/vision/page.js"
     ],
-    "/(routes)/product/page": [
+    "/_not-found/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(routes)/product/page.js"
-    ],
-    "/(routes)/video/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(routes)/video/page.js"
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }
