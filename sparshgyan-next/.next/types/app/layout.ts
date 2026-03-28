@@ -1,4 +1,4 @@
-// File: E:\upes_hackthon\Build4Bharat\Build4Bharat_upes\sparshgyan-next\app\layout.tsx
+// File: /Users/vardaan/Projects/Build4Bharat_upes/sparshgyan-next/app/layout.tsx
 import * as entry from '../../../app/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

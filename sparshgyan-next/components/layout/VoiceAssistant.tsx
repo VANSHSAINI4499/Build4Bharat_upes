@@ -1,82 +1,71 @@
-'use client'
+'use client';
 
-import React, { useEffect, useCallback, useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { Mic, MicOff, Volume2, ChevronDown, ChevronUp } from 'lucide-react'
-import { useAppStore } from '@/store/useAppStore'
-import { useSpeech } from '@/lib/hooks/useSpeech'
-import { useSerial } from '@/lib/hooks/useSerial'
-import { VoiceWaveform } from '@/components/magic/VoiceWaveform'
-import { cn } from '@/lib/utils'
-import { useRouter, usePathname } from 'next/navigation'
-import { toast } from 'sonner'
+import React, { useEffect, useCallback, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Mic, MicOff, Volume2, ChevronDown, ChevronUp } from 'lucide-react';
+import { useAppStore } from '@/store/useAppStore';
+import { useSpeech } from '@/lib/hooks/useSpeech';
+import { useSerial } from '@/lib/hooks/useSerial';
+import { VoiceWaveform } from '@/components/magic/VoiceWaveform';
+import { cn } from '@/lib/utils';
+import { useRouter, usePathname } from 'next/navigation';
+import { toast } from 'sonner';
+import {
+  inferDestinationFromCommand,
+  resolveDestination,
+} from '@/lib/voiceRouting';
 
 export function VoiceAssistant() {
-  const [expanded, setExpanded] = useState(false)
-  const [lastCommand, setLastCommand] = useState('')
-  const router = useRouter()
-  const pathname = usePathname()
+  const [expanded, setExpanded] = useState(false);
+  const [lastCommand, setLastCommand] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const isListening = useAppStore((s) => s.isListening)
-  const statusMsg = useAppStore((s) => s.statusMsg)
-  const micError = useAppStore((s) => s.micError)
+  const isListening = useAppStore((s) => s.isListening);
+  const statusMsg = useAppStore((s) => s.statusMsg);
+  const micError = useAppStore((s) => s.micError);
 
-  const { enqueue } = useSerial()
+  const { enqueue } = useSerial();
   const { startListening, stopListening, setEnqueue } = useSpeech({
-    onVoiceCommand: useCallback((cmd: string) => {
-      const lower = cmd.toLowerCase().trim()
-      setLastCommand(cmd)
+    onVoiceCommand: useCallback(
+      (cmd: string) => {
+        setLastCommand(cmd);
 
-      let matched = false
+        const destination = inferDestinationFromCommand(cmd);
+        if (!destination) {
+          toast('Command not recognized', { description: `"${cmd}"` });
+          return;
+        }
 
-      if (lower.includes('home') || lower.includes('dashboard')) {
-        router.push('/')
-        toast.success('Going home')
-        matched = true
-      }
-      if (lower.includes('caption') || lower.includes('captions')) {
-        router.push('/captions')
-        toast.success('Opening Live Captions')
-        matched = true
-      }
-      if (lower.includes('vision') || lower.includes('camera')) {
-        router.push('/vision')
-        toast.success('Opening Vision Assist')
-        matched = true
-      }
-      if (lower.includes('course') || lower.includes('product') || lower.includes('learn')) {
-        router.push('/product')
-        toast.success('Opening Courses')
-        matched = true
-      }
-      if (lower.includes('video') || lower.includes('watch')) {
-        router.push('/video')
-        toast.success('Opening Video Lessons')
-        matched = true
-      }
+        const resolved = resolveDestination(destination);
+        router.push(resolved.path);
 
-      if (!matched) {
-        toast('Command not recognized', { description: `"${cmd}"` })
-      }
-    }, [router]),
-  })
+        if (resolved.fallback) {
+          toast(resolved.message);
+        } else {
+          toast.success(resolved.message);
+        }
+      },
+      [router],
+    ),
+  });
 
   // Wire serial enqueue into speech hook
   useEffect(() => {
-    setEnqueue(enqueue)
-  }, [enqueue, setEnqueue])
+    setEnqueue(enqueue);
+  }, [enqueue, setEnqueue]);
 
   const toggle = () => {
     if (isListening) {
-      stopListening()
-      toast('Microphone off')
+      stopListening();
+      toast('Microphone off');
     } else {
-      startListening()
+      startListening();
     }
-  }
+  };
 
   // Don't render on /captions — that page owns the mic directly
-  if (pathname === '/captions') return null
+  if (pathname === '/captions') return null;
 
   return (
     <motion.div
@@ -111,10 +100,12 @@ export function VoiceAssistant() {
 
               {/* Status */}
               <div className="text-center mb-3">
-                <p className={cn(
-                  'text-sm font-medium',
-                  isListening ? 'text-green-400' : 'text-white/50'
-                )}>
+                <p
+                  className={cn(
+                    'text-sm font-medium',
+                    isListening ? 'text-green-400' : 'text-white/50',
+                  )}
+                >
                   {statusMsg}
                 </p>
               </div>
@@ -140,7 +131,13 @@ export function VoiceAssistant() {
               <div className="rounded-xl bg-white/3 border border-white/5 px-3 py-2">
                 <p className="text-xs text-white/30 mb-1">Say:</p>
                 <div className="flex flex-wrap gap-1">
-                  {['open captions', 'open vision', 'go home', 'open video', 'open course'].map((cmd) => (
+                  {[
+                    'open captions',
+                    'open vision',
+                    'go home',
+                    'open video',
+                    'open course',
+                  ].map((cmd) => (
                     <span
                       key={cmd}
                       className="text-[10px] px-2 py-0.5 rounded-full border border-white/8 bg-white/4 text-white/40"
@@ -175,7 +172,7 @@ export function VoiceAssistant() {
               'h-12 w-12 rounded-2xl flex items-center justify-center shadow-xl transition-all',
               isListening
                 ? 'bg-gradient-to-br from-green-600 to-emerald-600 shadow-green-900/40'
-                : 'bg-gradient-to-br from-purple-600 to-blue-600 shadow-purple-900/40'
+                : 'bg-gradient-to-br from-purple-600 to-blue-600 shadow-purple-900/40',
             )}
             whileTap={{ scale: 0.92 }}
             aria-label={isListening ? 'Stop listening' : 'Start listening'}
@@ -197,5 +194,5 @@ export function VoiceAssistant() {
         </div>
       </div>
     </motion.div>
-  )
+  );
 }

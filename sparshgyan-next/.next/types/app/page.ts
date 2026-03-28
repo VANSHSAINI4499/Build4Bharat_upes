@@ -1,4 +1,4 @@
-// File: E:\upes_hackthon\Build4Bharat\Build4Bharat_upes\sparshgyan-next\app\page.tsx
+// File: /Users/vardaan/Projects/Build4Bharat_upes/sparshgyan-next/app/page.tsx
 import * as entry from '../../../app/page.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 
