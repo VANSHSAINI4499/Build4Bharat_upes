@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ─── Braille map (reused from Subtitles.jsx logic) ────────────────────────────
@@ -15,6 +15,10 @@ const toBraille = (text) =>
     .split('')
     .map((ch) => brailleMap[ch] ?? ch)
     .join('');
+
+// Max phrases kept in the DOM at once. Older phrases are dropped from state
+// (not cached anywhere) so the list never accumulates memory over time.
+const MAX_VISIBLE = 20;
 
 // ─── Component ────────────────────────────────────────────────────────────────
 const LiveCaptions = () => {
@@ -40,6 +44,8 @@ const LiveCaptions = () => {
   const captionIdRef = useRef(0);            // Monotonically increasing caption IDs
   const networkRetryRef = useRef(0);         // Consecutive network-error counter
   const retryTimerRef = useRef(null);        // setTimeout handle for network retry
+  const rafRef = useRef(null);              // RAF handle — throttles interim setState
+  const scrollRafRef = useRef(null);        // RAF handle — throttles auto-scroll
 
   // ─────────────────────────────────────────────────────────────────────────
   // Camera setup — request video stream and bind it to the <video> element
@@ -104,10 +110,17 @@ const LiveCaptions = () => {
             window.speechSynthesis.speak(utt);
           }
 
-          setCaptions((prev) => [
-            ...prev,
-            { id: ++captionIdRef.current, text: finalText, isFinal: true },
-          ]);
+          // Cap visible captions at MAX_VISIBLE to prevent unbounded DOM growth.
+          // Phrases beyond the cap are simply removed from state — they are NOT
+          // cached or stored anywhere, so memory stays flat no matter how long
+          // the session runs.
+          setCaptions((prev) => {
+            const next = [
+              ...prev,
+              { id: ++captionIdRef.current, text: finalText, isFinal: true },
+            ];
+            return next.length > MAX_VISIBLE ? next.slice(next.length - MAX_VISIBLE) : next;
+          });
           setInterimText('');
         } else {
           // Interim phrase — accumulated and shown live below the caption list
@@ -115,8 +128,15 @@ const LiveCaptions = () => {
         }
       }
 
+      // Throttle interim setState through requestAnimationFrame.
+      // Recognition fires events 10-20x per second; without this every event
+      // triggers a full React re-render, causing the lag after ~50 words.
       if (interim) {
-        setInterimText(interim);
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+          setInterimText(interim);
+          rafRef.current = null;
+        });
       }
     };
 
@@ -180,18 +200,28 @@ const LiveCaptions = () => {
     return () => {
       shouldListenRef.current = false;
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
       recognition.stop();
     };
   }, []); // ttsEnabled intentionally excluded — toggling TTS doesn't need a new instance
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Auto-scroll — keep the bottom of the caption box visible
+  // Auto-scroll — throttled via RAF so rapid interim updates don't cause
+  // scrollIntoView to fire more than once per animation frame.
   // ─────────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (autoScroll && captionEndRef.current) {
-      captionEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (!autoScroll || !captionEndRef.current) return;
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+    scrollRafRef.current = requestAnimationFrame(() => {
+      captionEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      scrollRafRef.current = null;
+    });
   }, [captions, interimText, autoScroll]);
+
+  // Cancel pending scroll RAF on unmount
+  useEffect(() => () => {
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current);
+  }, []);
 
   // ─────────────────────────────────────────────────────────────────────────
   // Cleanup camera and mic on unmount
@@ -248,8 +278,13 @@ const LiveCaptions = () => {
     setInterimText('');
   };
 
-  // Full caption text (finals only) joined for Braille preview
-  const allCaptionText = captions.map((c) => c.text).join(' ');
+  // Full caption text (finals only) joined for Braille/stats.
+  // useMemo ensures this does NOT recompute on every rapid interim re-render —
+  // it only reruns when the finalised captions array actually changes.
+  const allCaptionText = useMemo(
+    () => captions.map((c) => c.text).join(' '),
+    [captions],
+  );
 
   // ─────────────────────────────────────────────────────────────────────────
   // Unsupported browser fallback
@@ -392,7 +427,7 @@ const LiveCaptions = () => {
           <div
             className="flex-1 bg-gray-950 border border-gray-700 rounded-2xl p-5 overflow-y-auto"
             style={{ minHeight: '320px', maxHeight: '55vh' }}
-            aria-live="polite"
+            aria-live="off"
             aria-label="Live caption output"
           >
             {captions.length === 0 && !interimText ? (
