@@ -78,7 +78,7 @@ def detect_gestures(frame, landmarks_list, processed):
             cv2.putText(frame, "Right Click", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 2)
             
         #DOUBLE CLICK
-        elif is_right_click(landmarks_list, thumb_index_dist): 
+        elif is_double_click(landmarks_list, thumb_index_dist): 
             pyautogui.doubleClick()
             cv2.putText(frame, "Double Click", (50,50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,0), 2)
               

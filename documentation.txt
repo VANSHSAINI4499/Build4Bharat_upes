@@ -3,12 +3,13 @@
 ## 1. Project Overview
 Sparshgyan is an accessibility-focused hackathon project that combines a learning interface with assistive interaction modes for users with visual, hearing, and motor accessibility needs.
 
-The repository currently contains three working parts:
+The repository currently contains four working parts:
 - A React + Vite frontend for the learning experience and accessibility controls.
 - An Arduino sketch that converts typed letters into tactile vibration patterns based on Braille dot mappings.
 - A Python virtual mouse module that uses hand tracking for gesture-based control.
+- A Live Captions page for deaf users that converts real-time speech to text and sends captions directly to the Arduino for tactile vibration.
 
-The overall idea is to let users interact with educational content through multiple access modes: voice guidance, on-screen Braille-like subtitles, gesture navigation, and tactile output.
+The overall idea is to let users interact with educational content through multiple access modes: voice guidance, on-screen Braille-like subtitles, gesture navigation, tactile output, and live speech-to-text captions.
 
 ## 2. Repository Structure
 
@@ -24,12 +25,15 @@ Important files:
 - `src/components/VoiceAssistant.jsx`: Adds speech recognition, speech synthesis, and voice-based navigation commands.
 - `src/components/AccessibilityControls.jsx`: Contains controls for Arduino connection via Web Serial and a local gesture toggle button.
 - `src/components/Subtitles.jsx`: Animates sample text into Braille Unicode characters for visual accessibility.
+- `src/components/LiveCaptions.jsx`: Full-page live speech-to-text captions for deaf users. Connects directly to the Arduino for real-time tactile output.
+- `src/components/Navbar.jsx`: Top navigation bar. Includes a "Live Captions" link for direct access.
 
 Frontend routes:
 - `/` and `/new`: Main dashboard
 - `/product`: Product/course details page
 - `/video`: Video learning page
 - `/vision`: Vision Assist page
+- `/captions`: Live Captions page (new)
 
 Tech stack:
 - React 18
@@ -46,8 +50,9 @@ How it works:
 - Each valid alphabet character is converted to a predefined Braille dot array.
 - A vibration motor attached to PWM pin `9` is pulsed to represent active Braille dots.
 - Inactive dots are represented by timing gaps, allowing the user to feel the pattern sequentially.
+- Each character takes approximately `2000 ms` to complete (6 dots × 250 ms + 500 ms gap).
 
-This module is intended to provide physical tactile feedback for typed text.
+This module is used for tactile feedback from both `AccessibilityControls.jsx` (manual text input) and `LiveCaptions.jsx` (live speech input).
 
 ### C. Python Gesture / Virtual Mouse (`virtual-Mouse/`)
 This module provides gesture-based mouse control using computer vision.
@@ -79,6 +84,7 @@ Current supported commands include:
 - `Stop reading`
 - `Go to AI course`
 - `Open vision assist`
+- `Open captions` / `Open live captions` (new)
 - `Go to home`
 - `Stop listening`
 
@@ -101,6 +107,36 @@ When connected:
 - Letters are sent one by one to the Arduino.
 - A `2000 ms` delay is used between letters so the hardware has time to finish vibrating each character pattern.
 
+### Live Captions (Speech-to-Text for Deaf Users)
+`LiveCaptions.jsx` is a dedicated full-page feature accessible at `/captions`.
+
+How it works:
+- Uses `SpeechRecognition` / `webkitSpeechRecognition` with `continuous = true` and `interimResults = true`.
+- Interim (partial) results are shown live in green italic text as the user speaks.
+- Finalised phrases are shown in white and merged into a rolling 30-word window.
+- Only the most recent 30 words are kept in React state at any time. Older words are dropped immediately — nothing is cached or accumulated, keeping memory flat regardless of session length.
+- Interim state updates are throttled through `requestAnimationFrame` (max ~60 updates/second) to prevent lag during rapid recognition events.
+- Auto-scroll is also RAF-throttled.
+- A small camera preview is shown on screen using `getUserMedia({ video: true })` for demo purposes.
+
+Performance characteristics:
+- Recognition fires 10–20 events/second. RAF throttling batches these into at most one React re-render per animation frame.
+- The DOM always contains exactly two `<p>` elements (finalised window + interim), regardless of how long the session runs.
+- Network errors from Chrome's speech service are silently retried up to 5 times before a banner is shown.
+
+Arduino integration in LiveCaptions:
+- The "Tactile Device" panel in the sidebar (left column) lets the user connect the Arduino via Web Serial directly from the captions page.
+- **Auto Vibrate (live)**: When toggled ON, every finalised speech phrase is automatically queued and sent to the Arduino letter by letter as it arrives.
+- **Send Captions Now**: Manual button — sends the current 30-word window to the Arduino on demand.
+- A live progress indicator shows which letter is currently being vibrated (e.g. `📳 H (1/5) — "hello"`).
+- A word queue (`vibrateQueueRef`) prevents the Arduino from being flooded — only one send loop runs at a time.
+- Char delay is `2000 ms` per letter, matching the Arduino vibration timing.
+
+Additional toggles available in LiveCaptions:
+- **Auto Scroll**: Keeps the latest caption visible.
+- **Show Braille**: Displays the current 30-word window converted to Braille Unicode characters.
+- **Text-to-Speech (TTS)**: Reads each finalised phrase back aloud via `SpeechSynthesis` (useful for mixed-need users or testing).
+
 ### Gesture Control
 The repository includes a separate Python-based gesture mouse system. It is designed to support hands-free interaction, especially for users who may have difficulty with a conventional mouse.
 
@@ -110,11 +146,11 @@ At the moment:
 - Full frontend-to-Flask integration is a future enhancement.
 
 ## 4. Current Architecture Summary
-This project is currently best understood as a multi-module prototype rather than a single fully integrated production system.
 
 Present integration status:
-- Frontend and Arduino connection: partially integrated through Web Serial in the browser.
-- Frontend and voice assistant: integrated in the React app.
+- Frontend and Arduino (AccessibilityControls): integrated — manual text input via Web Serial.
+- Frontend and Arduino (LiveCaptions): integrated — live speech captions sent to Arduino automatically.
+- Frontend and voice assistant: integrated — including the new "open captions" command.
 - Frontend and Python virtual mouse: not yet integrated through API calls.
 - Backend database/authentication layer: not present in the current repository.
 
@@ -133,6 +169,7 @@ Present integration status:
 4. Upload the sketch.
 5. Open the Serial Monitor and use baud rate `9600`.
 6. Type letters `A-Z` to test tactile output.
+7. For live caption vibration, connect from the `/captions` page using the "Connect Arduino" button in the sidebar.
 
 ### C. Run the Python Virtual Mouse Service
 1. Open a terminal in `Build4Bharat_upes/virtual-Mouse`.
@@ -142,15 +179,28 @@ Present integration status:
 
 If needed, the gesture engine can also be run directly through `virtualmouse.py`.
 
+### D. Use the Live Captions Feature
+1. Start the React frontend.
+2. Navigate to `http://localhost:5173/captions` or click "Live Captions" in the navbar, or say "Open captions" to the voice assistant.
+3. Allow microphone and camera permissions when prompted.
+4. Click "Start Listening".
+5. Spoken words appear as captions in real time.
+6. Optionally connect the Arduino using the "Connect Arduino" button and enable "Auto Vibrate (live)" to feel each word as it is spoken.
+
+Note: Live Captions uses Chrome's Web Speech API which requires an active internet connection. Audio is processed by Google's speech recognition servers.
+
 ## 6. Known Limitations
-- The documentation previously referenced a backend authentication system, but that system is not part of the current repo.
 - The gesture toggle in the frontend does not yet start or stop the Flask virtual mouse service.
 - Some displayed course and video content is placeholder/demo content.
-- Browser-based features such as microphone access and Web Serial require user permission and compatible browsers.
+- Browser-based features such as microphone access and Web Serial require user permission and compatible browsers (Chrome or Edge recommended).
+- Live Captions requires an internet connection — the Web Speech API sends audio to Google's servers for processing.
+- The Live Captions Braille toggle shows a visual Unicode representation only. It does not automatically send to the Arduino; use the "Auto Vibrate" toggle or "Send Captions Now" button for that.
 
 ## 7. Future Improvement Ideas
 - Connect the React accessibility controls directly to the Flask gesture API.
 - Replace sample text in `Subtitles.jsx` with live subtitles or lesson text.
-- Send lesson/video text directly to the Arduino tactile module in real time.
+- Add an offline speech recognition option (e.g. Whisper.js via WebAssembly) so Live Captions works without internet.
 - Add persistent course data and a real backend if authentication or content management is needed.
 - Improve error handling and device status feedback across all accessibility modules.
+- Add language selection to the Live Captions page for non-English speakers.
+
