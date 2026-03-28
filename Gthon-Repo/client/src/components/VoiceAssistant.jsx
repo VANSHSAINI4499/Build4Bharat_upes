@@ -1,5 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getReadableSections } from '../utils/contentReader';
+
+const READING_STYLE_PRESETS = {
+    compact: { label: 'Compact', pauseMultiplier: 0.7, speechRate: 1.15 },
+    natural: { label: 'Natural', pauseMultiplier: 1, speechRate: 1 },
+    slow: { label: 'Slow', pauseMultiplier: 1.45, speechRate: 0.85 },
+};
 
 const VoiceAssistant = () => {
     const navigate = useNavigate();
@@ -7,6 +14,13 @@ const VoiceAssistant = () => {
     const recognitionRef = useRef(null);
     const shouldKeepListeningRef = useRef(false);
     const navigationTimerRef = useRef(null);
+    const readDelayTimerRef = useRef(null);
+    const readerStateRef = useRef({
+        sections: [],
+        sectionIndex: 0,
+        chunkIndex: 0,
+        paused: false,
+    });
 
     const [isSupported, setIsSupported] = useState(true);
     const [isListening, setIsListening] = useState(false);
@@ -14,50 +28,34 @@ const VoiceAssistant = () => {
     const [lastCommand, setLastCommand] = useState('');
     const [feedback, setFeedback] = useState('Idle');
     const [manualCommand, setManualCommand] = useState('');
+    const [currentSectionLabel, setCurrentSectionLabel] = useState('');
+    const [readingStyle, setReadingStyle] = useState('natural');
 
     const commandHints = useMemo(
         () => [
             'Read this page',
             'Stop reading',
+            'Pause reading',
+            'Next section',
             'Go to AI course',
             'Open vision assist',
         ],
         [],
     );
 
-    const stopReading = () => {
+    const stopReading = (message = 'Stopped reading.') => {
         window.speechSynthesis.cancel();
-        setIsSpeaking(false);
-    };
-
-    const readPage = () => {
-        const bodyText = (document.body?.innerText || '').replace(/\s+/g, ' ').trim();
-
-        if (!bodyText) {
-            setFeedback('No readable text found on this page.');
-            return;
+        if (readDelayTimerRef.current) {
+            clearTimeout(readDelayTimerRef.current);
+            readDelayTimerRef.current = null;
         }
-
-        stopReading();
-
-        const utterance = new SpeechSynthesisUtterance(bodyText.slice(0, 2500));
-        utterance.rate = 1;
-        utterance.pitch = 1;
-        utterance.onend = () => {
-            setIsSpeaking(false);
-            setFeedback('Finished reading.');
-        };
-        utterance.onerror = () => {
-            setIsSpeaking(false);
-            setFeedback('Text-to-speech could not start on this browser.');
-        };
-
-        window.speechSynthesis.speak(utterance);
-        setIsSpeaking(true);
-        setFeedback('Reading this page...');
+        readerStateRef.current.paused = false;
+        setIsSpeaking(false);
+        setCurrentSectionLabel('');
+        setFeedback(message);
     };
 
-    const speakAssistant = (message) => {
+    const speakAssistant = (message, onEnd) => {
         if (!window.speechSynthesis) {
             return;
         }
@@ -66,7 +64,128 @@ const VoiceAssistant = () => {
         const utterance = new SpeechSynthesisUtterance(message);
         utterance.rate = 1;
         utterance.pitch = 1;
+        utterance.onend = () => {
+            if (onEnd) {
+                onEnd();
+            }
+        };
         window.speechSynthesis.speak(utterance);
+    };
+
+    const readCurrentChunk = () => {
+        const { sections, sectionIndex, chunkIndex, paused } = readerStateRef.current;
+
+        if (paused || !sections.length) {
+            return;
+        }
+
+        const section = sections[sectionIndex];
+        const chunk = section?.chunks?.[chunkIndex];
+        const chunkText = typeof chunk === 'string' ? chunk : chunk?.text;
+        const styleConfig = READING_STYLE_PRESETS[readingStyle] || READING_STYLE_PRESETS.natural;
+        const basePauseMs = typeof chunk === 'string' ? 650 : chunk?.pauseAfterMs || 650;
+        const pauseAfterMs = Math.round(
+            basePauseMs * styleConfig.pauseMultiplier,
+        );
+
+        if (!section || !chunkText) {
+            setIsSpeaking(false);
+            setCurrentSectionLabel('');
+            setFeedback('Finished reading all sections.');
+            return;
+        }
+
+        setIsSpeaking(true);
+        setCurrentSectionLabel(`${section.heading} (${sectionIndex + 1}/${sections.length})`);
+        setFeedback(`Reading: ${section.heading}`);
+
+        const utterance = new SpeechSynthesisUtterance(chunkText);
+        utterance.rate = styleConfig.speechRate;
+        utterance.pitch = 1;
+        utterance.onend = () => {
+            const state = readerStateRef.current;
+            const activeSection = state.sections[state.sectionIndex];
+
+            if (!activeSection) {
+                setIsSpeaking(false);
+                setCurrentSectionLabel('');
+                return;
+            }
+
+            if (state.chunkIndex < activeSection.chunks.length - 1) {
+                state.chunkIndex += 1;
+            } else {
+                state.sectionIndex += 1;
+                state.chunkIndex = 0;
+            }
+
+            readDelayTimerRef.current = setTimeout(() => {
+                if (readerStateRef.current.paused) {
+                    return;
+                }
+
+                if (state.sectionIndex >= state.sections.length) {
+                    setIsSpeaking(false);
+                    setCurrentSectionLabel('');
+                    setFeedback('Finished reading all sections.');
+                    return;
+                }
+
+                readCurrentChunk();
+            }, pauseAfterMs);
+        };
+        utterance.onerror = () => {
+            setIsSpeaking(false);
+            setCurrentSectionLabel('');
+            setFeedback('Text-to-speech could not start on this browser.');
+        };
+
+        window.speechSynthesis.speak(utterance);
+    };
+
+    const readPage = () => {
+        const sections = getReadableSections();
+
+        if (!sections.length) {
+            setFeedback('No readable main content found on this page.');
+            return;
+        }
+
+        readerStateRef.current = {
+            sections,
+            sectionIndex: 0,
+            chunkIndex: 0,
+            paused: false,
+        };
+
+        speakAssistant('Okay, reading the main content now.', () => {
+            readCurrentChunk();
+        });
+    };
+
+    const moveToSection = (step) => {
+        const state = readerStateRef.current;
+
+        if (!state.sections.length) {
+            setFeedback('Nothing is being read right now.');
+            return;
+        }
+
+        const nextSectionIndex = Math.min(
+            state.sections.length - 1,
+            Math.max(0, state.sectionIndex + step),
+        );
+
+        state.sectionIndex = nextSectionIndex;
+        state.chunkIndex = 0;
+        state.paused = false;
+
+        if (readDelayTimerRef.current) {
+            clearTimeout(readDelayTimerRef.current);
+            readDelayTimerRef.current = null;
+        }
+        window.speechSynthesis.cancel();
+        readCurrentChunk();
     };
 
     const goToRoute = (path, pageName) => {
@@ -95,8 +214,57 @@ const VoiceAssistant = () => {
         }
 
         if (text.includes('stop reading')) {
-            stopReading();
-            setFeedback('Stopped reading.');
+            stopReading('Stopped reading.');
+            return;
+        }
+
+        if (text.includes('pause reading')) {
+            if (readDelayTimerRef.current) {
+                clearTimeout(readDelayTimerRef.current);
+                readDelayTimerRef.current = null;
+            }
+            window.speechSynthesis.pause();
+            readerStateRef.current.paused = true;
+            setFeedback('Paused reading.');
+            return;
+        }
+
+        if (text.includes('resume reading')) {
+            if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+            } else if (!window.speechSynthesis.speaking) {
+                readCurrentChunk();
+            }
+            readerStateRef.current.paused = false;
+            setFeedback('Resumed reading.');
+            return;
+        }
+
+        if (text.includes('reading style compact')) {
+            setReadingStyle('compact');
+            setFeedback('Reading style set to Compact.');
+            return;
+        }
+
+        if (text.includes('reading style natural')) {
+            setReadingStyle('natural');
+            setFeedback('Reading style set to Natural.');
+            return;
+        }
+
+        if (text.includes('reading style slow')) {
+            setReadingStyle('slow');
+            setFeedback('Reading style set to Slow.');
+            return;
+        }
+
+        if (text.includes('next section')) {
+            moveToSection(1);
+            return;
+        }
+
+        if (text.includes('previous section') || text.includes('back section')) {
+            moveToSection(-1);
             return;
         }
 
@@ -175,7 +343,11 @@ const VoiceAssistant = () => {
             if (navigationTimerRef.current) {
                 clearTimeout(navigationTimerRef.current);
             }
-            stopReading();
+            if (readDelayTimerRef.current) {
+                clearTimeout(readDelayTimerRef.current);
+                readDelayTimerRef.current = null;
+            }
+            stopReading('Voice assistant reset.');
         };
     }, []);
 
@@ -236,11 +408,34 @@ const VoiceAssistant = () => {
     }
 
     return (
-        <div className="voice-assistant-panel" aria-live="polite">
+        <div className="voice-assistant-panel skip-reading" data-no-read="true" aria-live="polite">
             <p className="voice-assistant-title">Voice Assistant</p>
-            <p className="voice-assistant-meta">{isListening ? 'Listening...' : 'Tap mic to start'}</p>
-            <p className="voice-assistant-feedback">{feedback}</p>
+            <p className="voice-assistant-meta" aria-live="polite" aria-atomic="true">
+                {isListening ? 'Listening...' : 'Tap mic to start'}
+            </p>
+            <p className="voice-assistant-feedback" role="status" aria-live="assertive" aria-atomic="true">
+                {feedback}
+            </p>
+            <p className="voice-assistant-meta">Reading style: {READING_STYLE_PRESETS[readingStyle].label}</p>
+            {currentSectionLabel ? <p className="voice-assistant-command">Reading: {currentSectionLabel}</p> : null}
             {lastCommand ? <p className="voice-assistant-command">Last: {lastCommand}</p> : null}
+
+            <div className="voice-assistant-style-row" role="group" aria-label="Reading style">
+                {Object.entries(READING_STYLE_PRESETS).map(([styleKey, config]) => (
+                    <button
+                        key={styleKey}
+                        type="button"
+                        className={`voice-assistant-style ${readingStyle === styleKey ? 'active' : ''}`}
+                        onClick={() => {
+                            setReadingStyle(styleKey);
+                            setFeedback(`Reading style set to ${config.label}.`);
+                        }}
+                        aria-pressed={readingStyle === styleKey}
+                    >
+                        {config.label}
+                    </button>
+                ))}
+            </div>
 
             <div className="voice-assistant-actions">
                 <button
@@ -253,11 +448,29 @@ const VoiceAssistant = () => {
                 <button
                     type="button"
                     className={`voice-assistant-button secondary ${isSpeaking ? 'active' : ''}`}
-                    onClick={isSpeaking ? stopReading : readPage}
+                    onClick={() => {
+                        if (isSpeaking) {
+                            stopReading('Stopped reading.');
+                            return;
+                        }
+
+                        readPage();
+                    }}
                 >
                     {isSpeaking ? 'Stop Reading' : 'Read Page'}
                 </button>
             </div>
+
+            {isSpeaking ? (
+                <div className="voice-assistant-actions">
+                    <button type="button" className="voice-assistant-button" onClick={() => moveToSection(-1)}>
+                        Previous
+                    </button>
+                    <button type="button" className="voice-assistant-button" onClick={() => moveToSection(1)}>
+                        Next
+                    </button>
+                </div>
+            ) : null}
 
             <form className="voice-assistant-input-row" onSubmit={runManualCommand}>
                 <input
@@ -277,6 +490,7 @@ const VoiceAssistant = () => {
                 {commandHints.map((item) => (
                     <li key={item}>{item}</li>
                 ))}
+                <li>Reading style Slow</li>
             </ul>
         </div>
     );

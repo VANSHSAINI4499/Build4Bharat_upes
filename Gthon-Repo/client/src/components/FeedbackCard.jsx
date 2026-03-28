@@ -6,14 +6,14 @@ const FeedbackCard = () => {
     <div className='bg-white p-8 rounded-3xl shadow-xl my-8 mx-2'>
       <div className='flex justify-between'>
         <div className='flex gap-4'>
-                <img src={avatar} />
-                <div>
-                    <h1>Jenny Wilson</h1>
-                    <p>UI-UX Designer</p>
-                </div>
-            
-            </div>
-            <img className='h-8' src={quotationMark} />
+          <img src={avatar} alt="Photo of Jenny Wilson" />
+          <div>
+            <h3>Jenny Wilson</h3>
+            <p>UI-UX Designer</p>
+          </div>
+
+        </div>
+        <img className='h-8' src={quotationMark} alt="" aria-hidden="true" />
       </div>
 
       <div className='py-8'>

@@ -5,7 +5,7 @@ const VisionAssist = () => {
     const navigate = useNavigate();
 
     return (
-        <div style={styles.page}>
+        <main id="main-content" style={styles.page} aria-label="Vision assist page">
             <div style={styles.card}>
                 <p style={styles.badge}>Vision Assist</p>
                 <h1 style={styles.title}>Accessibility Vision Mode</h1>
@@ -20,11 +20,11 @@ const VisionAssist = () => {
                     <span style={styles.feature}>Voice + tactile workflow</span>
                 </div>
 
-                <button style={styles.button} onClick={() => navigate('/new')}>
+                <button type="button" style={styles.button} onClick={() => navigate('/new')}>
                     Back to Dashboard
                 </button>
             </div>
-        </div>
+        </main>
     );
 };
 

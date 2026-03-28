@@ -1,7 +1,7 @@
 import React from 'react';
 import '../Styles/Product.css';
 import Subtitles from './Subtitles';
-import {useNavigate} from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 const Productdetails = () => {
   const product = {
@@ -25,12 +25,12 @@ const Productdetails = () => {
 
   const navigate = useNavigate();
 
-  const move = ()=>{
+  const move = () => {
     navigate("/video")
   }
 
   return (
-    <div className="product-details">
+    <main id="main-content" className="product-details" aria-label="Course details page">
       <div className="product-images">
         {product.images.map((img, index) => (
           <img key={index} src={img} alt={`${product.title} view ${index + 1}`} />
@@ -61,7 +61,7 @@ const Productdetails = () => {
           <span>({product.reviews.length} reviews)</span>
         </div>
 
-        <button className="add-to-cart" disabled={product.stock === 0} onClick={move}>
+        <button type="button" className="add-to-cart" disabled={product.stock === 0} onClick={move}>
           Watch Video Now
         </button>
 
@@ -72,7 +72,7 @@ const Productdetails = () => {
           <Subtitles />
         </div>
       </div>
-    </div>
+    </main>
   );
 };
 

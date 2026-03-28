@@ -77,7 +77,7 @@ const AccessibilityControls = () => {
   };
 
   return (
-    <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+    <div className="fixed bottom-6 right-6 flex flex-col gap-3 z-50 skip-reading" data-no-read="true" aria-label="Accessibility hardware controls">
 
       {/* Arduino Hardware Integration */}
       {arduinoConnected ? (
@@ -98,6 +98,7 @@ const AccessibilityControls = () => {
           <button
             onClick={sendWordToArduino}
             disabled={sending}
+            aria-label={sending ? 'Tactile device currently vibrating' : 'Send text to tactile device'}
             className={`w-full py-1 rounded text-sm font-bold mb-2 ${sending ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#20B486] text-white hover:bg-green-700'
               }`}
           >
@@ -105,6 +106,7 @@ const AccessibilityControls = () => {
           </button>
           <button
             onClick={disconnectArduino}
+            aria-label="Disconnect tactile device"
             className="w-full bg-red-100 text-red-600 text-sm py-1 rounded hover:bg-red-200"
           >
             Disconnect
@@ -113,6 +115,7 @@ const AccessibilityControls = () => {
       ) : (
         <button
           onClick={connectArduino}
+          aria-label="Connect tactile device"
           className="px-4 py-3 rounded-full shadow-lg font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all"
         >
           🔌 Connect Tactile Device
@@ -122,6 +125,7 @@ const AccessibilityControls = () => {
       {/* Gesture Control Toggle */}
       <button
         onClick={toggleGestureControl}
+        aria-label={gestureActive ? 'Stop hand gesture controls' : 'Enable hand gesture controls'}
         className={`px-4 py-3 rounded-full shadow-lg font-bold transition-all ${gestureActive ? 'bg-red-500 text-white' : 'bg-[#20B486] text-white hover:bg-green-700'
           }`}
       >
