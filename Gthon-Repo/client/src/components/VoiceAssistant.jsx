@@ -21,6 +21,7 @@ const VoiceAssistant = () => {
             'Stop reading',
             'Go to AI course',
             'Open vision assist',
+            'Open captions',
         ],
         [],
     );
@@ -107,6 +108,11 @@ const VoiceAssistant = () => {
 
         if (text.includes('open vision assist') || text.includes('go to vision assist')) {
             goToRoute('/vision', 'Vision Assist');
+            return;
+        }
+
+        if (text.includes('open captions') || text.includes('go to captions') || text.includes('open live captions')) {
+            goToRoute('/captions', 'Live Captions');
             return;
         }
 

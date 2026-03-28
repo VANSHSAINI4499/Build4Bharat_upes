@@ -6,6 +6,7 @@ import Productdetails from './components/Productdetails';
 import Video from './components/Video';
 import VoiceAssistant from './components/VoiceAssistant';
 import VisionAssist from './components/VisionAssist';
+import LiveCaptions from './components/LiveCaptions';
 
 const App = () => {
   return (
@@ -17,6 +18,7 @@ const App = () => {
           <Route path='/product' element={<Productdetails />}></Route>
           <Route path='/video' element={<Video />}></Route>
           <Route path='/vision' element={<VisionAssist />}></Route>
+          <Route path='/captions' element={<LiveCaptions />}></Route>
         </Routes>
         <VoiceAssistant />
       </BrowserRouter>
