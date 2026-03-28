@@ -2,43 +2,47 @@
 
 import React from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, Award, Clock, Users, Star, ChevronRight } from 'lucide-react'
+import { BookOpen, Award, Clock, Users, Star, ChevronRight, Play } from 'lucide-react'
 import { ArduinoPanel } from '@/components/accessibility/ArduinoPanel'
 import { BrailleDisplay } from '@/components/accessibility/BrailleDisplay'
 import { GlowCard } from '@/components/magic/GlowCard'
 import { AnimatedGradientText } from '@/components/magic/AnimatedGradientText'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
 
 const COURSES = [
   {
     id: 1,
-    title: 'Digital Literacy for All',
+    title: 'AI for Accessibility',
+    description: 'Learn how AI helps people with disabilities — from vision assistance to speech recognition and predictive systems.',
     level: 'Beginner',
-    duration: '8 weeks',
-    students: '12.4K',
-    rating: 4.9,
-    tags: ['Sign Language', 'Visual', 'Tactile'],
+    duration: '2h 30m',
+    students: '14.2K',
+    rating: 4.8,
+    tags: ['AI', 'Accessibility', 'Machine Learning'],
     color: '#7c3aed',
   },
   {
     id: 2,
-    title: 'Assistive Technology Basics',
+    title: 'Computer Vision Basics',
+    description: 'Understand gesture recognition systems, hand tracking, and how OpenCV + MediaPipe power hands-free control.',
     level: 'Intermediate',
-    duration: '6 weeks',
-    students: '8.1K',
-    rating: 4.8,
-    tags: ['Screen Reader', 'Braille', 'Voice'],
+    duration: '3h',
+    students: '9.5K',
+    rating: 4.7,
+    tags: ['CV', 'ML', 'Gesture', 'MediaPipe'],
     color: '#3b82f6',
   },
   {
     id: 3,
-    title: 'Inclusive Web Design',
+    title: 'Speech Recognition Systems',
+    description: 'Build real-time voice applications using Web Speech API, NLP pipelines, and live transcription techniques.',
     level: 'Advanced',
-    duration: '10 weeks',
-    students: '5.7K',
-    rating: 4.7,
-    tags: ['WCAG', 'ARIA', 'Keyboard Nav'],
+    duration: '4h',
+    students: '6.1K',
+    rating: 4.9,
+    tags: ['NLP', 'Voice', 'Web Speech API'],
     color: '#10b981',
   },
 ]
@@ -50,6 +54,8 @@ const LEVEL_COLOR: Record<string, string> = {
 }
 
 export default function ProductPage() {
+  const router = useRouter()
+
   return (
     <div className="min-h-screen bg-[#050508] pt-24 pb-12 px-4">
       <div className="max-w-7xl mx-auto">
@@ -87,17 +93,18 @@ export default function ProductPage() {
                       >
                         <BookOpen className="h-5 w-5" style={{ color: course.color }} />
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap mb-1.5">
                           <h3 className="text-base font-bold text-white">{course.title}</h3>
                           <Badge variant={(LEVEL_COLOR[course.level] ?? 'secondary') as 'success' | 'default' | 'cyan' | 'secondary'}>
                             {course.level}
                           </Badge>
                         </div>
+                        <p className="text-sm text-white/50 mb-2 leading-relaxed">{course.description}</p>
                         <div className="flex items-center gap-4 text-xs text-white/40 mb-2.5">
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{course.duration}</span>
                           <span className="flex items-center gap-1"><Users className="h-3 w-3" />{course.students}</span>
-                          <span className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-400" />{course.rating}</span>
+                          <span className="flex items-center gap-1"><Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />{course.rating}</span>
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {course.tags.map((t) => (
@@ -110,11 +117,12 @@ export default function ProductPage() {
                     </div>
                     <Button
                       size="sm"
-                      variant="outline"
-                      className="shrink-0 group-hover:bg-white/10 transition-colors"
+                      className="shrink-0"
+                      style={{ background: course.color }}
+                      onClick={() => router.push(`/video?course=${encodeURIComponent(course.title)}`)}
                     >
-                      Enroll
-                      <ChevronRight className="h-3.5 w-3.5" />
+                      <Play className="h-3.5 w-3.5" />
+                      Start Learning
                     </Button>
                   </div>
                 </GlowCard>

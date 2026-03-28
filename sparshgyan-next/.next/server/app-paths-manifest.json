@@ -1,4 +1,9 @@
 {
   "/page": "app/page.js",
-  "/(routes)/captions/page": "app/(routes)/captions/page.js"
+  "/(routes)/captions/page": "app/(routes)/captions/page.js",
+  "/(routes)/vision/page": "app/(routes)/vision/page.js",
+  "/(routes)/product/page": "app/(routes)/product/page.js",
+  "/api/gesture/stop/route": "app/api/gesture/stop/route.js",
+  "/(routes)/video/page": "app/(routes)/video/page.js",
+  "/api/gesture/start/route": "app/api/gesture/start/route.js"
 }

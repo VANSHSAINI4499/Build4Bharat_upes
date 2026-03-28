@@ -9,6 +9,7 @@ import { useSerial } from '@/lib/hooks/useSerial'
 import { VoiceWaveform } from '@/components/magic/VoiceWaveform'
 import { cn } from '@/lib/utils'
 import { useRouter, usePathname } from 'next/navigation'
+import { toast } from 'sonner'
 
 export function VoiceAssistant() {
   const [expanded, setExpanded] = useState(false)
@@ -23,13 +24,40 @@ export function VoiceAssistant() {
   const { enqueue } = useSerial()
   const { startListening, stopListening, setEnqueue } = useSpeech({
     onVoiceCommand: useCallback((cmd: string) => {
+      const lower = cmd.toLowerCase().trim()
       setLastCommand(cmd)
-      const lower = cmd.toLowerCase()
-      if (lower.includes('home') || lower.includes('dashboard')) router.push('/')
-      if (lower.includes('caption') || lower.includes('captions')) router.push('/captions')
-      if (lower.includes('vision') || lower.includes('camera')) router.push('/vision')
-      if (lower.includes('course') || lower.includes('product')) router.push('/product')
-      if (lower.includes('video')) router.push('/video')
+
+      let matched = false
+
+      if (lower.includes('home') || lower.includes('dashboard')) {
+        router.push('/')
+        toast.success('Going home')
+        matched = true
+      }
+      if (lower.includes('caption') || lower.includes('captions')) {
+        router.push('/captions')
+        toast.success('Opening Live Captions')
+        matched = true
+      }
+      if (lower.includes('vision') || lower.includes('camera')) {
+        router.push('/vision')
+        toast.success('Opening Vision Assist')
+        matched = true
+      }
+      if (lower.includes('course') || lower.includes('product') || lower.includes('learn')) {
+        router.push('/product')
+        toast.success('Opening Courses')
+        matched = true
+      }
+      if (lower.includes('video') || lower.includes('watch')) {
+        router.push('/video')
+        toast.success('Opening Video Lessons')
+        matched = true
+      }
+
+      if (!matched) {
+        toast('Command not recognized', { description: `"${cmd}"` })
+      }
     }, [router]),
   })
 
@@ -39,8 +67,12 @@ export function VoiceAssistant() {
   }, [enqueue, setEnqueue])
 
   const toggle = () => {
-    if (isListening) stopListening()
-    else startListening()
+    if (isListening) {
+      stopListening()
+      toast('Microphone off')
+    } else {
+      startListening()
+    }
   }
 
   // Don't render on /captions — that page owns the mic directly
@@ -108,7 +140,7 @@ export function VoiceAssistant() {
               <div className="rounded-xl bg-white/3 border border-white/5 px-3 py-2">
                 <p className="text-xs text-white/30 mb-1">Say:</p>
                 <div className="flex flex-wrap gap-1">
-                  {['open captions', 'open vision', 'go home', 'open video'].map((cmd) => (
+                  {['open captions', 'open vision', 'go home', 'open video', 'open course'].map((cmd) => (
                     <span
                       key={cmd}
                       className="text-[10px] px-2 py-0.5 rounded-full border border-white/8 bg-white/4 text-white/40"

@@ -1,22 +1,38 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['GLOG_minloglevel'] = '3'
+os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
+
 import cv2
-import mediapipe as mp #mediapipe library has hands module which allows us to detect all the endpoints and landmarks of hand and the hand gestures
+import mediapipe as mp
 import pyautogui
 import util
 import random
+import numpy as np
 from pynput.mouse import Button, Controller
 mouse = Controller()
 
 screen_width, screen_height = pyautogui.size()
 mouse = Controller()
 
-mpHands=mp.solutions.hands
-hands=mpHands.Hands(
-    static_image_mode=False, #false bc we r capturing video
-    model_complexity=1,  #for better model
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7, #only if at least 70% confident of a hand detected, track it
-    max_num_hands=1 #max 1 hand to detect for control
+mpHands = mp.solutions.hands
+hands = mpHands.Hands(
+    static_image_mode=False,
+    model_complexity=1,
+    min_detection_confidence=0.5,   # lowered from 0.7 — handles poor lighting
+    min_tracking_confidence=0.5,    # lowered from 0.7
+    max_num_hands=1
 )
+
+def preprocess_frame(frame):
+    """Improve contrast/brightness so MediaPipe detects hands under backlight."""
+    # Convert to LAB, apply CLAHE to L channel (fixes backlit / overexposed scenes)
+    lab = cv2.cvtColor(frame, cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(lab)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    l = clahe.apply(l)
+    enhanced = cv2.merge((l, a, b))
+    return cv2.cvtColor(enhanced, cv2.COLOR_LAB2BGR)
 
 def find_finger_tip(processed):
     if processed.multi_hand_landmarks:
@@ -92,36 +108,45 @@ def detect_gestures(frame, landmarks_list, processed):
         
 
 def main():
+    # Try camera index 0; fall back to 1 if unavailable
     cap = cv2.VideoCapture(0)
-    draw = mp.solutions.drawing_utils #helps in drawing the landmarks
-    
+    if not cap.isOpened():
+        cap = cv2.VideoCapture(1)
+
+    draw = mp.solutions.drawing_utils
+
     try:
         while cap.isOpened():
-            ret,frame = cap.read()
-            
+            ret, frame = cap.read()
+
             if not ret:
                 break
-            frame=cv2.flip(frame,1)
-            frameRGB=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB) #mediapipe requires frames to be passed in RGB format while openCV by default captures in BGR
-            processed = hands.process(frameRGB) #will process all the frames and detecyt all teh landmarks
-            
-            landmarks_list = []   #array to receive all the landmarks from the processed frames
-            
-            if processed.multi_hand_landmarks:  #if multiple hands detected
-                hand_landmarks = processed.multi_hand_landmarks[0] #take landmarks from one of the hands
+
+            frame = cv2.flip(frame, 1)
+
+            # Enhance contrast to handle backlight / varying lighting
+            enhanced = preprocess_frame(frame)
+
+            frameRGB = cv2.cvtColor(enhanced, cv2.COLOR_BGR2RGB)
+            processed = hands.process(frameRGB)
+
+            landmarks_list = []
+
+            if processed.multi_hand_landmarks:
+                hand_landmarks = processed.multi_hand_landmarks[0]
                 draw.draw_landmarks(frame, hand_landmarks, mpHands.HAND_CONNECTIONS)
-                
-                for lm in hand_landmarks.landmark: 
-                    landmarks_list.append((lm.x, lm.y)) #taking all x & y coordinates of individual landmarks and pushing it to the list
-                 
-            detect_gestures(frame, landmarks_list, processed)   
-                    
-            cv2.imshow('Frame',frame)
-            if cv2.waitKey(1) & 0xFF == ord('q'):  #just wait for 1 ms after each frame is ret & if the keyboard input in this wait period is q then break
+
+                for lm in hand_landmarks.landmark:
+                    landmarks_list.append((lm.x, lm.y))
+
+            detect_gestures(frame, landmarks_list, processed)
+
+            cv2.imshow('Frame', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-            
+
     finally:
-        cap.release()  #after being done we need to release all the captures and destroy all the windows that opencv had created 
+        cap.release()
         cv2.destroyAllWindows()
         
 if __name__=='__main__':   #to ensure that if you're importing this file to any other python files, this function won't work

@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Toaster } from 'sonner'
 import { Navbar } from '@/components/layout/Navbar'
 import { VoiceAssistant } from '@/components/layout/VoiceAssistant'
+import { ElevenLabsWidget } from '@/components/layout/ElevenLabsWidget'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -28,6 +29,7 @@ export default function RootLayout({
         <Navbar />
         <main className="min-h-screen">{children}</main>
         <VoiceAssistant />
+        <ElevenLabsWidget />
         <Toaster
           theme="dark"
           position="bottom-center"

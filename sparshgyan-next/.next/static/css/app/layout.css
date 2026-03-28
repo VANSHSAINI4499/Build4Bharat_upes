@@ -1163,6 +1163,9 @@ video {
 .bg-black\/80 {
   background-color: rgb(0 0 0 / 0.8);
 }
+.bg-black\/85 {
+  background-color: rgb(0 0 0 / 0.85);
+}
 .bg-blue-600\/10 {
   background-color: rgb(37 99 235 / 0.1);
 }
@@ -1331,6 +1334,12 @@ video {
   -webkit-background-clip: text;
           background-clip: text;
 }
+.fill-current {
+  fill: currentColor;
+}
+.fill-yellow-400 {
+  fill: #facc15;
+}
 .object-cover {
   -o-object-fit: cover;
      object-fit: cover;
@@ -1436,6 +1445,9 @@ video {
 }
 .text-center {
   text-align: center;
+}
+.text-right {
+  text-align: right;
 }
 .font-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -1935,10 +1947,6 @@ video {
   opacity: 0.5;
 }
 
-.group:hover .group-hover\:bg-white\/10 {
-  background-color: rgb(255 255 255 / 0.1);
-}
-
 .group:hover .group-hover\:text-purple-300 {
   --tw-text-opacity: 1;
   color: rgb(216 180 254 / var(--tw-text-opacity, 1));
@@ -1977,6 +1985,10 @@ video {
 }
 
 @media (min-width: 640px) {
+
+  .sm\:block {
+    display: block;
+  }
 
   .sm\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));

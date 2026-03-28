@@ -1,206 +1,251 @@
 # Sparshgyan: Project Documentation
 
 ## 1. Project Overview
-Sparshgyan is an accessibility-focused hackathon project that combines a learning interface with assistive interaction modes for users with visual, hearing, and motor accessibility needs.
+Sparshgyan is an accessibility-first hackathon project designed to make digital education reachable for users with visual, hearing, and motor disabilities. It combines a Next.js web platform with a Python hand-gesture engine and an Arduino haptic Braille controller.
 
-The repository currently contains four working parts:
-- A React + Vite frontend for the learning experience and accessibility controls.
-- An Arduino sketch that converts typed letters into tactile vibration patterns based on Braille dot mappings.
-- A Python virtual mouse module that uses hand tracking for gesture-based control.
-- A Live Captions page for deaf users that converts real-time speech to text and sends captions directly to the Arduino for tactile vibration.
+The repository contains three working parts:
+- A Next.js 14 (App Router) frontend with TypeScript and Tailwind CSS — rebuilt from the earlier React/Vite prototype.
+- An Arduino sketch that maps letters A–Z to tactile 6-dot Braille vibration patterns over serial.
+- A Python virtual mouse module that uses computer vision (MediaPipe) to convert hand gestures into mouse events, exposed via a Flask API.
 
-The overall idea is to let users interact with educational content through multiple access modes: voice guidance, on-screen Braille-like subtitles, gesture navigation, tactile output, and live speech-to-text captions.
+Users can interact with educational content through four access modes: voice-command navigation, on-screen Unicode Braille output, gesture-based cursor control, and live speech-to-text captions with real-time haptic feedback.
 
 ## 2. Repository Structure
 
-### A. Frontend Web Application (`Gthon-Repo/client/`)
-This is a React application built with Vite.
+```
+Build4Bharat_upes/
+├── sparshgyan-next/      ← Next.js 14 frontend (primary)
+├── AdrinoCodes/
+│   └── bil369/
+│       └── bil369.ino    ← Arduino Braille haptic sketch
+├── virtual-Mouse/        ← Python gesture / virtual mouse
+│   ├── app.py
+│   ├── virtualmouse.py
+│   ├── util.py
+│   └── requirements.txt
+└── documentation.txt
+```
 
-Important files:
-- `src/App.jsx`: Defines the client routes and mounts the global voice assistant.
-- `src/components/New.jsx`: Main landing/dashboard page that assembles the homepage sections.
-- `src/components/Productdetails.jsx`: Displays a sample course/product page and embeds the Braille subtitle panel.
-- `src/components/Video.jsx`: Shows a sample learning video page with related content and subtitles.
-- `src/components/VisionAssist.jsx`: Dedicated vision-assist screen for hands-free interaction messaging.
-- `src/components/VoiceAssistant.jsx`: Adds speech recognition, speech synthesis, and voice-based navigation commands.
-- `src/components/AccessibilityControls.jsx`: Contains controls for Arduino connection via Web Serial and a local gesture toggle button.
-- `src/components/Subtitles.jsx`: Animates sample text into Braille Unicode characters for visual accessibility.
-- `src/components/LiveCaptions.jsx`: Full-page live speech-to-text captions for deaf users. Connects directly to the Arduino for real-time tactile output.
-- `src/components/Navbar.jsx`: Top navigation bar. Includes a "Live Captions" link for direct access.
+---
 
-Frontend routes:
-- `/` and `/new`: Main dashboard
-- `/product`: Product/course details page
-- `/video`: Video learning page
-- `/vision`: Vision Assist page
-- `/captions`: Live Captions page (new)
+### A. Next.js Frontend (`sparshgyan-next/`)
 
 Tech stack:
-- React 18
-- Vite
-- React Router
-- Tailwind CSS + custom CSS
-- Browser APIs: Speech Recognition, Speech Synthesis, Web Serial
+- Next.js 14.2.5 with App Router (server + client components)
+- React 18, TypeScript 5
+- Tailwind CSS 3, Framer Motion 11
+- Zustand 4 (global state)
+- Radix UI primitives, Lucide icons, Sonner toasts
+- Browser APIs: Web Speech Recognition, SpeechSynthesis, Web Serial, MediaDevices
+
+#### Pages & Routes
+
+| Route | File | Description |
+|---|---|---|
+| `/` | `app/page.tsx` | Landing page — renders `<Hero />` and `<FeatureGrid />` with CTAs to `/captions` and `/vision`. Server Component. |
+| `/captions` | `app/(routes)/captions/page.tsx` | Live speech-to-text captions page. Full mic control, rolling 30-word window, Arduino sidebar, Braille display sidebar, TTS toggle. |
+| `/product` | `app/(routes)/product/page.tsx` | Accessible courses catalogue — three demo courses with difficulty badges, ratings, and tags. Arduino and Braille sidebars included. |
+| `/video` | `app/(routes)/video/page.tsx` | Video lessons page — YouTube embed with live caption overlay showing last 12 words of transcript. Arduino and Braille sidebars included. |
+| `/vision` | `app/(routes)/vision/page.tsx` | Webcam gesture page — live camera preview, `<GestureControl />` sidebar for starting/stopping the Python gesture service. |
+
+#### API Routes (Next.js proxy to Flask)
+
+| Endpoint | File | Description |
+|---|---|---|
+| `POST /api/gesture/start` | `app/api/gesture/start/route.ts` | Forwards to `http://localhost:5000/api/start-mouse` with a 5-second timeout. Returns `503` if the Python service is unreachable. |
+| `POST /api/gesture/stop` | `app/api/gesture/stop/route.ts` | Forwards to `http://localhost:5000/api/stop-mouse`. Returns `{ ok: true }` silently on failure — stopping is treated as best-effort. |
+
+#### Global Layout (`app/layout.tsx`)
+Every page is wrapped in:
+- `<Navbar />` — fixed top navigation with active-link animation
+- `<VoiceAssistant />` — floating bottom-right mic widget (hidden on `/captions`)
+- `<Toaster />` — Sonner dark-themed toast notifications
+- Next.js `Metadata` with Open Graph tags
+
+#### Components
+
+**Accessibility (`components/accessibility/`)**
+- `ArduinoPanel.tsx` — Sidebar panel. Connect/disconnect button, connection status badge, Auto Vibrate toggle (sends each finalised phrase to Arduino automatically), "Send Captions Now" manual button, live vibration progress display (e.g. `📳 H (1/5) — "hello"`).
+- `BrailleDisplay.tsx` — Sidebar panel. Converts current `windowText` to Unicode Braille via `lib/braille.ts`. Toggle to show/hide with Framer Motion animation. Visual reference only; hardware output is handled by `ArduinoPanel`.
+- `GestureControl.tsx` — Sidebar panel. Start/Stop the Python gesture service. Four status states: `idle`, `starting` (spinner), `running` (pulsing ring), `error`. Displays gesture hint reference (✌️ two fingers, ☝️ one finger, ✊ fist).
+
+**Layout (`components/layout/`)**
+- `Navbar.tsx` — glassmorphic fixed navbar with desktop links, Framer Motion animated active indicator, mobile hamburger menu, and a live green pulsing dot when the mic is active.
+- `VoiceAssistant.tsx` — Floating expandable panel. Processes voice commands for app-wide navigation. Supported commands: `open captions`, `go home`, `open vision`, `open video`, `open course`. Shows waveform, status, last command, mic errors, and hint chips.
+
+**Sections (`components/sections/`)**
+- `Hero.tsx` — Full-viewport landing hero with `BackgroundBeams`, `Particles`, stagger animations. Eyebrow badge, headline, subtitle, two CTAs, four feature pills, three stats (500ms caption latency, 4 accessibility modes, 100% open source).
+- `FeatureGrid.tsx` — Bento 3-column grid of four feature cards linking to each route. Scroll-triggered `whileInView` stagger animation.
+
+**Magic UI (`components/magic/`)**
+- `BackgroundBeams.tsx`, `Particles.tsx`, `AnimatedGradientText.tsx`, `GlowCard.tsx`, `VoiceWaveform.tsx`, `AccessibilityScore.tsx` — visual/animation utilities used across pages.
+
+**UI Primitives (`components/ui/`)**
+- `badge.tsx`, `button.tsx`, `switch.tsx` — Radix UI-based styled primitives.
+
+#### Hooks (`lib/hooks/`)
+
+- `useSpeech.ts` — Wraps the Web Speech Recognition API (`continuous = true`, `interimResults = true`, `en-US`). Maintains a rolling 30-word window (`windowText`) and live partial result (`interimText`). On each final result: optionally triggers TTS, triggers Auto Vibrate (calls `enqueueRef`), and fires an `onVoiceCommand` callback (used by `VoiceAssistant`). Auto-restarts on network errors up to 10 times with backoff.
+- `useSerial.ts` — Wraps the Web Serial API. Connects to the Arduino at 9600 baud. `enqueue(text)`: splits text into words and pushes to an in-memory queue. `drainQueue()`: sends one character byte at a time with a **2000 ms delay** between each character matching the Arduino's vibration timing. Updates `vibrateProgress` in the store.
+- `useGesture.ts` — Calls the Next.js proxy endpoints (`/api/gesture/start` and `/api/gesture/stop`) to start/stop the Python gesture service. Updates `gestureStatus` (`starting` → `running` or `error`) and `gestureActive` in the Zustand store.
+
+#### Utilities (`lib/`)
+- `braille.ts` — Pure utility. `brailleMap` lookup table for a–z, 0–9, and punctuation (`. , ! ? -`) → Unicode Braille characters. `toBraille(text)` lowercases input and maps each character.
+- `utils.ts` — `cn()` helper combining `clsx` + `tailwind-merge`.
+
+#### Global State (`store/useAppStore.ts`)
+Single flat Zustand store. State domains:
+
+| Domain | Key Fields |
+|---|---|
+| Captions / Speech | `windowText`, `interimText`, `isListening`, `statusMsg`, `micError` |
+| Arduino / Haptics | `arduinoConnected`, `autoVibrate`, `vibrateProgress` |
+| Gesture | `gestureActive`, `gestureStatus` (`idle \| starting \| running \| error`) |
+| UI Preferences | `autoScroll`, `showBraille`, `ttsEnabled` |
+| Accessibility Score | `accessibilityScore` (default: 72) |
+
+---
 
 ### B. Arduino Tactile Output (`AdrinoCodes/bil369/bil369.ino`)
-This sketch runs on an Arduino and maps letters `A-Z` to 6-dot Braille patterns.
+Runs on an Arduino and maps letters A–Z to 6-dot Braille patterns.
 
 How it works:
 - Serial input is read at `9600` baud.
 - Each valid alphabet character is converted to a predefined Braille dot array.
-- A vibration motor attached to PWM pin `9` is pulsed to represent active Braille dots.
-- Inactive dots are represented by timing gaps, allowing the user to feel the pattern sequentially.
+- A vibration motor on PWM pin `9` is pulsed to represent active Braille dots.
+- Inactive dots are represented by timing gaps so the user can feel each pattern sequentially.
 - Each character takes approximately `2000 ms` to complete (6 dots × 250 ms + 500 ms gap).
 
-This module is used for tactile feedback from both `AccessibilityControls.jsx` (manual text input) and `LiveCaptions.jsx` (live speech input).
+Used for tactile output from two sources:
+- `ArduinoPanel.tsx` — manual "Send Captions Now" or Auto Vibrate from any page.
+- Directly from the `/captions` page sidebar.
+
+---
 
 ### C. Python Gesture / Virtual Mouse (`virtual-Mouse/`)
-This module provides gesture-based mouse control using computer vision.
+Provides gesture-based hands-free cursor control using computer vision.
 
 Important files:
-- `app.py`: Flask API for starting and stopping the gesture mouse script as a separate process.
-- `virtualmouse.py`: Uses OpenCV, MediaPipe, PyAutoGUI, and Pynput to detect hand gestures and convert them into mouse actions.
-- `util.py`: Helper math functions used for gesture calculations.
-- `requirements.txt`: Python dependencies.
+- `app.py` — Flask API with `/api/start-mouse` and `/api/stop-mouse` endpoints. Spawns/terminates the gesture script as a subprocess.
+- `virtualmouse.py` — Uses OpenCV, MediaPipe, PyAutoGUI, and Pynput to detect hand landmarks and translate them into cursor movement, left click, right click, and screenshot actions.
+- `util.py` — Helper math functions for gesture angle/distance calculations.
+- `requirements.txt` — Python dependencies.
+- `venv/` — Local Python virtual environment (not committed to git).
 
-Supported gesture actions in the current script:
+Supported gesture actions:
 - Cursor movement
 - Left click
 - Right click
 - Screenshot capture
 
-Note:
-- The React frontend currently only toggles a local gesture state in `AccessibilityControls.jsx`.
-- It does not yet call the Flask endpoints in `virtual-Mouse/app.py`.
-- That means the UI and the Python gesture service are present in the repo, but not fully wired together yet.
+Integration status: **fully wired**. The Next.js frontend calls the Flask endpoints via `/api/gesture/start` and `/api/gesture/stop` proxy routes.
+
+---
 
 ## 3. Feature Flow
 
-### Voice Assistance
-`VoiceAssistant.jsx` is rendered globally, so it remains available across the app.
+### Voice Navigation
+`VoiceAssistant.tsx` is mounted globally in the root layout and available on every page (except `/captions` which manages its own mic).
 
-Current supported commands include:
-- `Read this page`
-- `Stop reading`
-- `Go to AI course`
-- `Open vision assist`
-- `Open captions` / `Open live captions` (new)
-- `Go to home`
-- `Stop listening`
-
-The component uses:
-- Speech recognition for command input
-- Speech synthesis for spoken feedback
-- React Router navigation for moving between pages
-
-### Visual Braille Output
-`Subtitles.jsx` converts sample text into Braille Unicode characters and reveals them progressively on screen.
-
-This creates a visual accessibility layer that complements the tactile Arduino module.
-
-### Tactile Device Output
-`AccessibilityControls.jsx` can connect to an Arduino through the browser Web Serial API.
-
-When connected:
-- The user enters a word or sentence.
-- Non-alphabetic characters are filtered out.
-- Letters are sent one by one to the Arduino.
-- A `2000 ms` delay is used between letters so the hardware has time to finish vibrating each character pattern.
+Supported commands:
+- `open captions` / `open live captions` → `/captions`
+- `go home` → `/`
+- `open vision` / `vision assist` → `/vision`
+- `open video` → `/video`
+- `open course` / `open courses` → `/product`
 
 ### Live Captions (Speech-to-Text for Deaf Users)
-`LiveCaptions.jsx` is a dedicated full-page feature accessible at `/captions`.
+`/captions` page powered by `useSpeech` hook.
 
-How it works:
-- Uses `SpeechRecognition` / `webkitSpeechRecognition` with `continuous = true` and `interimResults = true`.
-- Interim (partial) results are shown live in green italic text as the user speaks.
-- Finalised phrases are shown in white and merged into a rolling 30-word window.
-- Only the most recent 30 words are kept in React state at any time. Older words are dropped immediately — nothing is cached or accumulated, keeping memory flat regardless of session length.
-- Interim state updates are throttled through `requestAnimationFrame` (max ~60 updates/second) to prevent lag during rapid recognition events.
-- Auto-scroll is also RAF-throttled.
-- A small camera preview is shown on screen using `getUserMedia({ video: true })` for demo purposes.
+- `continuous = true`, `interimResults = true` — recognition fires 10–20 events/second.
+- Interim (partial) results show live as the user speaks.
+- Final results are merged into a rolling 30-word window — older words are dropped, keeping memory flat.
+- Auto Vibrate: every finalised phrase is queued and sent to the Arduino letter by letter as it arrives.
+- TTS toggle reads each finalised phrase aloud via `SpeechSynthesis`.
+- Auto-scroll and RAF throttling keep the UI smooth during rapid recognition.
+- Network errors from Chrome's speech service are silently retried up to 10 times with backoff.
 
-Performance characteristics:
-- Recognition fires 10–20 events/second. RAF throttling batches these into at most one React re-render per animation frame.
-- The DOM always contains exactly two `<p>` elements (finalised window + interim), regardless of how long the session runs.
-- Network errors from Chrome's speech service are silently retried up to 5 times before a banner is shown.
+### Haptic Braille Output
+`ArduinoPanel.tsx` + `useSerial.ts` + `bil369.ino` work together:
+1. User connects the Arduino via Web Serial from the sidebar panel.
+2. `enqueue(text)` splits words into a queue; `drainQueue()` sends one character at a time with 2000 ms spacing.
+3. The Arduino vibrates the corresponding Braille dot pattern for each letter.
+4. A progress indicator shows the current character (e.g. `📳 H (1/5) — "hello"`).
 
-Arduino integration in LiveCaptions:
-- The "Tactile Device" panel in the sidebar (left column) lets the user connect the Arduino via Web Serial directly from the captions page.
-- **Auto Vibrate (live)**: When toggled ON, every finalised speech phrase is automatically queued and sent to the Arduino letter by letter as it arrives.
-- **Send Captions Now**: Manual button — sends the current 30-word window to the Arduino on demand.
-- A live progress indicator shows which letter is currently being vibrated (e.g. `📳 H (1/5) — "hello"`).
-- A word queue (`vibrateQueueRef`) prevents the Arduino from being flooded — only one send loop runs at a time.
-- Char delay is `2000 ms` per letter, matching the Arduino vibration timing.
-
-Additional toggles available in LiveCaptions:
-- **Auto Scroll**: Keeps the latest caption visible.
-- **Show Braille**: Displays the current 30-word window converted to Braille Unicode characters.
-- **Text-to-Speech (TTS)**: Reads each finalised phrase back aloud via `SpeechSynthesis` (useful for mixed-need users or testing).
+### Visual Braille Display
+`BrailleDisplay.tsx` converts `windowText` to Unicode Braille characters via `toBraille()` in `lib/braille.ts`. Displayed in large amber monospace text. Visual reference only — no direct hardware output.
 
 ### Gesture Control
-The repository includes a separate Python-based gesture mouse system. It is designed to support hands-free interaction, especially for users who may have difficulty with a conventional mouse.
+`GestureControl.tsx` + `useGesture.ts` + `app/api/gesture/*` + `virtual-Mouse/app.py`:
+1. User clicks Start on the Vision Assist page.
+2. `useGesture.start()` POSTs to `/api/gesture/start`.
+3. The Next.js route handler proxies to `http://localhost:5000/api/start-mouse`.
+4. Flask spawns `virtualmouse.py` as a subprocess.
+5. MediaPipe detects hand landmarks in the webcam feed and drives the cursor.
 
-At the moment:
-- The Python gesture engine exists and can run independently.
-- The frontend button changes UI state only.
-- Full frontend-to-Flask integration is a future enhancement.
+---
 
 ## 4. Current Architecture Summary
 
-Present integration status:
-- Frontend and Arduino (AccessibilityControls): integrated — manual text input via Web Serial.
-- Frontend and Arduino (LiveCaptions): integrated — live speech captions sent to Arduino automatically.
-- Frontend and voice assistant: integrated — including the new "open captions" command.
-- Frontend and Python virtual mouse: not yet integrated through API calls.
-- Backend database/authentication layer: not present in the current repository.
+| Integration | Status |
+|---|---|
+| Next.js frontend ↔ Arduino (Web Serial) | Integrated — from every page sidebar |
+| Next.js frontend ↔ Live Captions + Arduino Auto Vibrate | Integrated |
+| Next.js frontend ↔ Voice navigation | Integrated |
+| Next.js frontend ↔ Python gesture service (via API proxy) | Integrated |
+| Authentication / backend database | Not present |
+
+---
 
 ## 5. How to Run the Project
 
-### A. Run the React Frontend
-1. Open a terminal in `Build4Bharat_upes/Gthon-Repo/client`.
+### A. Run the Next.js Frontend
+1. Open a terminal in `sparshgyan-next/`.
 2. Run `npm install`.
 3. Run `npm run dev`.
-4. Open the local Vite URL shown in the terminal, usually `http://localhost:5173`.
+4. Open `http://localhost:3000`.
 
 ### B. Run the Arduino Module
 1. Connect the Arduino board to your computer.
-2. Connect the vibration motor to the Arduino circuit as required by your hardware setup.
+2. Wire the vibration motor to PWM pin `9`.
 3. Open `AdrinoCodes/bil369/bil369.ino` in the Arduino IDE.
-4. Upload the sketch.
-5. Open the Serial Monitor and use baud rate `9600`.
-6. Type letters `A-Z` to test tactile output.
-7. For live caption vibration, connect from the `/captions` page using the "Connect Arduino" button in the sidebar.
+4. Upload the sketch (baud rate `9600`).
+5. On the web app, click "Connect Arduino" in any sidebar panel to pair the device via Web Serial.
 
 ### C. Run the Python Virtual Mouse Service
-1. Open a terminal in `Build4Bharat_upes/virtual-Mouse`.
-2. Install dependencies with `pip install -r requirements.txt`.
-3. Start the Flask API with `python app.py`.
-4. The service runs on `http://localhost:5000`.
-
-If needed, the gesture engine can also be run directly through `virtualmouse.py`.
+1. Open a terminal in `virtual-Mouse/`.
+2. Activate the virtual environment: `.\venv\Scripts\activate` (Windows) or `source venv/bin/activate` (macOS/Linux).
+3. Install dependencies: `pip install -r requirements.txt`.
+4. Start the Flask API: `python app.py`.
+5. The service runs on `http://localhost:5000`.
+6. On the web app, navigate to `/vision` and click "Start Gesture Service".
 
 ### D. Use the Live Captions Feature
-1. Start the React frontend.
-2. Navigate to `http://localhost:5173/captions` or click "Live Captions" in the navbar, or say "Open captions" to the voice assistant.
-3. Allow microphone and camera permissions when prompted.
+1. Start the Next.js frontend.
+2. Navigate to `http://localhost:3000/captions` or say "open captions" to the voice assistant.
+3. Allow microphone permissions when prompted.
 4. Click "Start Listening".
-5. Spoken words appear as captions in real time.
-6. Optionally connect the Arduino using the "Connect Arduino" button and enable "Auto Vibrate (live)" to feel each word as it is spoken.
+5. Spoken words appear as rolling captions.
+6. Optionally connect the Arduino and enable "Auto Vibrate" to feel each word as it is spoken.
 
-Note: Live Captions uses Chrome's Web Speech API which requires an active internet connection. Audio is processed by Google's speech recognition servers.
+Note: Live Captions requires Chrome or Edge. The Web Speech API sends audio to Google's servers and requires an active internet connection.
+
+---
 
 ## 6. Known Limitations
-- The gesture toggle in the frontend does not yet start or stop the Flask virtual mouse service.
-- Some displayed course and video content is placeholder/demo content.
-- Browser-based features such as microphone access and Web Serial require user permission and compatible browsers (Chrome or Edge recommended).
-- Live Captions requires an internet connection — the Web Speech API sends audio to Google's servers for processing.
-- The Live Captions Braille toggle shows a visual Unicode representation only. It does not automatically send to the Arduino; use the "Auto Vibrate" toggle or "Send Captions Now" button for that.
+- Browser-based features (microphone, Web Serial, camera) require Chrome or Edge and explicit user permissions.
+- Live Captions requires an internet connection — audio is processed by Google's speech recognition servers.
+- The Visual Braille display (`BrailleDisplay`) is a Unicode reference only; hardware output requires the Arduino to be connected and Auto Vibrate enabled.
+- Course and video content is currently placeholder/demo data.
+- The video page embeds a static YouTube iframe; replace the video ID for actual course content.
+
+---
 
 ## 7. Future Improvement Ideas
-- Connect the React accessibility controls directly to the Flask gesture API.
-- Replace sample text in `Subtitles.jsx` with live subtitles or lesson text.
 - Add an offline speech recognition option (e.g. Whisper.js via WebAssembly) so Live Captions works without internet.
-- Add persistent course data and a real backend if authentication or content management is needed.
-- Improve error handling and device status feedback across all accessibility modules.
+- Swap the YouTube placeholder on the video page with real course content or a self-hosted video player.
+- Add persistent course data and a real backend if user accounts or content management are needed.
 - Add language selection to the Live Captions page for non-English speakers.
+- Extend Braille output to support Grade-2 Braille contractions.
+- Add haptic feedback for punctuation and numbers on the Arduino.
 

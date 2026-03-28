@@ -13,6 +13,7 @@ import { ArduinoPanel } from '@/components/accessibility/ArduinoPanel'
 import { BrailleDisplay } from '@/components/accessibility/BrailleDisplay'
 import { VoiceWaveform } from '@/components/magic/VoiceWaveform'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 export default function CaptionsPage() {
   const isListening = useAppStore((s) => s.isListening)
@@ -86,12 +87,12 @@ export default function CaptionsPage() {
               Clear
             </Button>
             {isListening ? (
-              <Button variant="destructive" onClick={stopListening} size="lg">
+              <Button variant="destructive" onClick={() => { stopListening(); toast('Microphone stopped') }} size="lg">
                 <MicOff className="h-4 w-4" />
                 Stop Listening
               </Button>
             ) : (
-              <Button onClick={startListening} size="lg">
+              <Button onClick={() => { startListening(); toast.success('Starting microphone…') }} size="lg">
                 <Mic className="h-4 w-4" />
                 Start Listening
               </Button>
@@ -144,12 +145,12 @@ export default function CaptionsPage() {
                 {allText ? (
                   <>
                     {/* Final text */}
-                    <p className="text-white/90 leading-relaxed font-medium whitespace-pre-wrap">
+                    <p className="text-white/90 leading-relaxed text-xl font-medium whitespace-pre-wrap">
                       {windowText}
                     </p>
                     {/* Interim text */}
                     {interimText && (
-                      <p className="text-white/40 italic mt-1">
+                      <p className="text-white/50 italic mt-2 text-lg">
                         {interimText}
                       </p>
                     )}

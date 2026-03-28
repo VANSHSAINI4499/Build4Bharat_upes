@@ -4,7 +4,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useAppStore } from '@/store/useAppStore'
 
 const MAX_WORDS = 30
-const NETWORK_MAX_RETRIES = 10
+const NETWORK_MAX_RETRIES = 999   // virtually unlimited — network blips are normal in Chrome
 
 type EnqueueFn = (text: string) => void
 
@@ -49,7 +49,9 @@ export function useSpeech(options?: UseSpeechOptions) {
       (window as unknown as { webkitSpeechRecognition?: typeof SpeechRecognition }).webkitSpeechRecognition
 
     if (!SR) {
+      console.warn('[useSpeech] SpeechRecognition not supported — use Chrome or Edge')
       useAppStore.getState().setStatusMsg('Speech recognition not supported. Use Chrome or Edge.')
+      useAppStore.getState().setMicError('This browser does not support speech recognition. Please use Chrome or Edge.')
       return
     }
 
@@ -58,7 +60,15 @@ export function useSpeech(options?: UseSpeechOptions) {
     recognition.interimResults = true
     recognition.lang = 'en-US'
 
+    recognition.onstart = () => {
+      console.log('[useSpeech] Recognition started')
+      useAppStore.getState().setIsListening(true)
+      useAppStore.getState().setStatusMsg('Listening…')
+      useAppStore.getState().setMicError('')
+    }
+
     recognition.onresult = (event) => {
+      console.log('[useSpeech] onresult — resultIndex:', event.resultIndex, 'results:', event.results.length)
       let interim = ''
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -66,6 +76,7 @@ export function useSpeech(options?: UseSpeechOptions) {
 
         if (event.results[i].isFinal) {
           const finalText = transcript.trim()
+          console.log('[useSpeech] Final result:', finalText)
           if (!finalText) continue
 
           // TTS playback
@@ -93,6 +104,8 @@ export function useSpeech(options?: UseSpeechOptions) {
           ]
           useAppStore.getState().setWindowText(words.slice(-MAX_WORDS).join(' '))
           useAppStore.getState().setInterimText('')
+          // Reset network counter on successful speech — transient errors don't count
+          networkRetryRef.current = 0
         } else {
           interim += transcript
         }
@@ -109,32 +122,20 @@ export function useSpeech(options?: UseSpeechOptions) {
     }
 
     recognition.onerror = (event) => {
+      console.warn('[useSpeech] onerror:', event.error)
       if (event.error === 'no-speech') return
 
       if (event.error === 'network') {
-        networkRetryRef.current += 1
-        if (shouldListenRef.current && networkRetryRef.current <= NETWORK_MAX_RETRIES) {
-          useAppStore.getState().setStatusMsg(
-            `Reconnecting… (${networkRetryRef.current}/${NETWORK_MAX_RETRIES})`
-          )
-          if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
-          // Exponential backoff: 1s, 2s, 4s, 8s … capped at 15s
-          const delay = Math.min(1000 * 2 ** (networkRetryRef.current - 1), 15000)
-          retryTimerRef.current = setTimeout(() => {
-            retryTimerRef.current = null
-            if (shouldListenRef.current) {
-              try { recognition.start() } catch { /* already starting */ }
-            }
-          }, delay)
-          return
-        }
-        // Retries exhausted — stop cleanly so onend doesn't loop
-        shouldListenRef.current = false
-        useAppStore.getState().setIsListening(false)
-        useAppStore.getState().setMicError(
-          'Speech service unreachable — check your internet connection.'
-        )
-        useAppStore.getState().setStatusMsg('Network error')
+        if (!shouldListenRef.current) return
+        // Chrome's speech service drops connection frequently — silently reconnect
+        if (retryTimerRef.current) clearTimeout(retryTimerRef.current)
+        useAppStore.getState().setStatusMsg('Listening…')
+        retryTimerRef.current = setTimeout(() => {
+          retryTimerRef.current = null
+          if (shouldListenRef.current) {
+            try { recognition.start() } catch { /* already starting */ }
+          }
+        }, 800)
         return
       }
 
@@ -145,9 +146,14 @@ export function useSpeech(options?: UseSpeechOptions) {
       }
       useAppStore.getState().setMicError(msgs[event.error] ?? `Recognition error: ${event.error}`)
       useAppStore.getState().setStatusMsg('Error')
+      if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+        shouldListenRef.current = false
+        useAppStore.getState().setIsListening(false)
+      }
     }
 
     recognition.onend = () => {
+      console.log('[useSpeech] onend — shouldListen:', shouldListenRef.current)
       // Auto-restart if still should be listening (and no pending retry timer)
       if (shouldListenRef.current && !retryTimerRef.current) {
         try { recognition.start() } catch { /* ignore */ }
@@ -169,8 +175,13 @@ export function useSpeech(options?: UseSpeechOptions) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const startListening = useCallback(async () => {
-    if (!recognitionRef.current) return
+    if (!recognitionRef.current) {
+      useAppStore.getState().setMicError('Speech recognition not available. Please use Chrome or Edge.')
+      return
+    }
+    if (useAppStore.getState().isListening) return   // prevent double start
     useAppStore.getState().setMicError('')
+    useAppStore.getState().setStatusMsg('Starting microphone…')
     networkRetryRef.current = 0
     if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
 
@@ -184,15 +195,18 @@ export function useSpeech(options?: UseSpeechOptions) {
           ? 'Microphone denied. Allow access in browser settings.'
           : 'Could not access microphone. Check device settings.'
       )
+      useAppStore.getState().setStatusMsg('Error')
       return
     }
 
     shouldListenRef.current = true
     try {
       recognitionRef.current.start()
-      useAppStore.getState().setIsListening(true)
-      useAppStore.getState().setStatusMsg('Listening…')
-    } catch { /* already started */ }
+      // onstart handler will set isListening + statusMsg
+    } catch (err) {
+      console.warn('[useSpeech] start() threw:', err)
+      /* already started — ignore */ 
+    }
   }, [])
 
   const stopListening = useCallback(() => {

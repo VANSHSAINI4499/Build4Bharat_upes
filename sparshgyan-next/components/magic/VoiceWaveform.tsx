@@ -31,7 +31,7 @@ export function VoiceWaveform({
           <motion.div
             key={i}
             className="w-[3px] rounded-full origin-bottom"
-            style={{ backgroundColor: color }}
+            style={{ height: `${minH}px`, backgroundColor: color }}
             animate={
               active
                 ? {
@@ -51,7 +51,6 @@ export function VoiceWaveform({
                   }
                 : { duration: 0.3 }
             }
-            style={{ height: `${minH}px`, backgroundColor: color }}
           />
         )
       })}

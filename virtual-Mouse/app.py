@@ -1,7 +1,11 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'          # suppress TF INFO/WARNING logs
+os.environ['GLOG_minloglevel'] = '3'               # suppress MediaPipe/absl logs
+os.environ['MEDIAPIPE_DISABLE_GPU'] = '1'
+
 from flask import Flask, jsonify
 from flask_cors import CORS
 import subprocess
-import os
 
 app = Flask(__name__)
 CORS(app) # Allow React frontend to access

@@ -13,6 +13,7 @@ interface SpeechRecognition extends EventTarget {
   continuous: boolean
   interimResults: boolean
   lang: string
+  onstart: (() => void) | null
   onresult: ((event: SpeechRecognitionEvent) => void) | null
   onerror: ((event: SpeechRecognitionErrorEvent) => void) | null
   onend: (() => void) | null
@@ -59,4 +60,16 @@ interface Serial extends EventTarget {
 
 interface Navigator {
   readonly serial: Serial
+}
+
+// ElevenLabs Conversational AI widget custom element
+declare namespace JSX {
+  interface IntrinsicElements {
+    'elevenlabs-convai': {
+      'agent-id'?: string
+      class?: string
+      style?: string
+      [key: string]: unknown
+    }
+  }
 }
