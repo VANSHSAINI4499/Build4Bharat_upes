@@ -12,6 +12,9 @@ const App = () => {
   return (
     <>
       <BrowserRouter>
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         <Routes>
           <Route path='/' element={<New />}></Route>
           <Route path='/new' element={<New />}></Route>

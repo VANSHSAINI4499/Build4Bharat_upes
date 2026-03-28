@@ -16,13 +16,15 @@ const New = () => {
   return (
     <div style={{ minHeight: '100vh', overflowX: 'hidden', position: 'relative' }}>
       <Navbar />
-      <Hero />
-      <Companies />
-      <Courses />
-      <Achievement />
-      <Categories />
-      <Feedback />
-      <CTA />
+      <main id="main-content" aria-label="Main learning dashboard content">
+        <Hero />
+        <Companies />
+        <Courses />
+        <Achievement />
+        <Categories />
+        <Feedback />
+        <CTA />
+      </main>
       <Footer />
       <AccessibilityControls />
     </div>

@@ -9,9 +9,9 @@ const Video = () => {
   ];
 
   return (
-    <div style={styles.pageWrapper}>
+    <main id="main-content" style={styles.pageWrapper} aria-label="Video learning page">
       {/* Left side: Main video and content */}
-      <div style={styles.contentWrapper}>
+      <section style={styles.contentWrapper} aria-label="Primary video content">
         <video style={styles.video} controls poster="https://via.placeholder.com/800x450">
           <source src="https://www.w3schools.com/html/mov_bbb.mp4" type="video/mp4" />
           Your browser does not support the video tag.
@@ -22,7 +22,7 @@ const Video = () => {
           Dive into this comprehensive React tutorial and build scalable web apps with ease. Perfect for beginners and pros alike.
         </p>
 
-        <button style={styles.buyButton}>Buy Now ₹499</button>
+        <button type="button" style={styles.buyButton}>Buy Now ₹499</button>
 
         <div style={styles.creatorBox}>
           <img src="https://via.placeholder.com/50" alt="Creator" style={styles.creatorImage} />
@@ -43,22 +43,22 @@ const Video = () => {
         <h2 style={styles.sectionTitle}>Related Videos</h2>
         <div style={styles.relatedContainer}>
           {relatedVideos.map((video, index) => (
-            <div key={index} style={styles.relatedCard}>
+            <article key={index} style={styles.relatedCard}>
               <img src={video.thumbnail} alt={video.title} style={styles.relatedThumbnail} />
               <div style={styles.relatedInfo}>
                 <p style={styles.relatedTitle}>{video.title}</p>
                 <span style={styles.relatedDuration}>{video.duration}</span>
               </div>
-            </div>
+            </article>
           ))}
         </div>
-      </div>
+      </section>
 
       {/* Right side: Subtitles */}
-      <div style={styles.subtitleWrapper}>
+      <aside style={styles.subtitleWrapper} aria-label="Subtitles panel" className="skip-reading" data-no-read="true">
         <Subtitles />
-      </div>
-    </div>
+      </aside>
+    </main>
   );
 };
 
