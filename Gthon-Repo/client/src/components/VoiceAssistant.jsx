@@ -545,7 +545,7 @@ const VoiceAssistant = () => {
                         ? 'Microphone permission denied. Please allow microphone access.'
                         : error?.name === 'NotFoundError'
                             ? 'Microphone not available to this browser session. Check site permissions and selected input device.'
-                        : 'Could not access microphone. Check browser permissions.';
+                            : 'Could not access microphone. Check browser permissions.';
                 setFeedback(message);
             }
         };
@@ -601,97 +601,97 @@ const VoiceAssistant = () => {
             ) : null}
 
             {isExpanded ? (
-            <div className="voice-assistant-panel">
-            <div className="voice-assistant-header">
-            <p className="voice-assistant-title">Voice Assistant</p>
-            <button type="button" className="voice-assistant-minimize" onClick={() => setIsExpanded(false)} aria-label="Collapse voice assistant">
-                Minimize
-            </button>
-            </div>
-            <p className="voice-assistant-meta" aria-live="polite" aria-atomic="true">
-                {isListening ? 'Listening...' : 'Tap mic to start'}
-            </p>
-            <p className="voice-assistant-feedback" role="status" aria-live="assertive" aria-atomic="true">
-                {feedback}
-            </p>
-            <p className="voice-assistant-meta">Reading style: {READING_STYLE_PRESETS[readingStyle].label}</p>
-            {currentSectionLabel ? <p className="voice-assistant-command">Reading: {currentSectionLabel}</p> : null}
-            {lastCommand ? <p className="voice-assistant-command">Last: {lastCommand}</p> : null}
+                <div className="voice-assistant-panel">
+                    <div className="voice-assistant-header">
+                        <p className="voice-assistant-title">Voice Assistant</p>
+                        <button type="button" className="voice-assistant-minimize" onClick={() => setIsExpanded(false)} aria-label="Collapse voice assistant">
+                            Minimize
+                        </button>
+                    </div>
+                    <p className="voice-assistant-meta" aria-live="polite" aria-atomic="true">
+                        {isListening ? 'Listening...' : 'Tap mic to start'}
+                    </p>
+                    <p className="voice-assistant-feedback" role="status" aria-live="assertive" aria-atomic="true">
+                        {feedback}
+                    </p>
+                    <p className="voice-assistant-meta">Reading style: {READING_STYLE_PRESETS[readingStyle].label}</p>
+                    {currentSectionLabel ? <p className="voice-assistant-command">Reading: {currentSectionLabel}</p> : null}
+                    {lastCommand ? <p className="voice-assistant-command">Last: {lastCommand}</p> : null}
 
-            <div className="voice-assistant-style-row" role="group" aria-label="Reading style">
-                {Object.entries(READING_STYLE_PRESETS).map(([styleKey, config]) => (
-                    <button
-                        key={styleKey}
-                        type="button"
-                        className={`voice-assistant-style ${readingStyle === styleKey ? 'active' : ''}`}
-                        onClick={() => {
-                            setReadingStyle(styleKey);
-                            setFeedback(`Reading style set to ${config.label}.`);
-                        }}
-                        aria-pressed={readingStyle === styleKey}
-                    >
-                        {config.label}
-                    </button>
-                ))}
-            </div>
+                    <div className="voice-assistant-style-row" role="group" aria-label="Reading style">
+                        {Object.entries(READING_STYLE_PRESETS).map(([styleKey, config]) => (
+                            <button
+                                key={styleKey}
+                                type="button"
+                                className={`voice-assistant-style ${readingStyle === styleKey ? 'active' : ''}`}
+                                onClick={() => {
+                                    setReadingStyle(styleKey);
+                                    setFeedback(`Reading style set to ${config.label}.`);
+                                }}
+                                aria-pressed={readingStyle === styleKey}
+                            >
+                                {config.label}
+                            </button>
+                        ))}
+                    </div>
 
-            <div className="voice-assistant-actions">
-                <button
-                    type="button"
-                    className={`voice-assistant-button voice-assistant-mic ${isListening ? 'active' : ''}`}
-                    onClick={toggleListening}
-                    disabled={isMicStarting}
-                >
-                    {isMicStarting ? 'Starting Mic...' : isListening ? 'Stop Mic' : 'Start Mic'}
-                </button>
-                <button
-                    type="button"
-                    className={`voice-assistant-button secondary ${isSpeaking ? 'active' : ''}`}
-                    onClick={() => {
-                        if (isSpeaking) {
-                            stopReading('Stopped reading.');
-                            return;
-                        }
+                    <div className="voice-assistant-actions">
+                        <button
+                            type="button"
+                            className={`voice-assistant-button voice-assistant-mic ${isListening ? 'active' : ''}`}
+                            onClick={toggleListening}
+                            disabled={isMicStarting}
+                        >
+                            {isMicStarting ? 'Starting Mic...' : isListening ? 'Stop Mic' : 'Start Mic'}
+                        </button>
+                        <button
+                            type="button"
+                            className={`voice-assistant-button secondary ${isSpeaking ? 'active' : ''}`}
+                            onClick={() => {
+                                if (isSpeaking) {
+                                    stopReading('Stopped reading.');
+                                    return;
+                                }
 
-                        readPage();
-                    }}
-                >
-                    {isSpeaking ? 'Stop Reading' : 'Read Page'}
-                </button>
-            </div>
+                                readPage();
+                            }}
+                        >
+                            {isSpeaking ? 'Stop Reading' : 'Read Page'}
+                        </button>
+                    </div>
 
-            {isSpeaking ? (
-                <div className="voice-assistant-actions">
-                    <button type="button" className="voice-assistant-button" onClick={() => moveToSection(-1)}>
-                        Previous
-                    </button>
-                    <button type="button" className="voice-assistant-button" onClick={() => moveToSection(1)}>
-                        Next
-                    </button>
+                    {isSpeaking ? (
+                        <div className="voice-assistant-actions">
+                            <button type="button" className="voice-assistant-button" onClick={() => moveToSection(-1)}>
+                                Previous
+                            </button>
+                            <button type="button" className="voice-assistant-button" onClick={() => moveToSection(1)}>
+                                Next
+                            </button>
+                        </div>
+                    ) : null}
+
+                    <form className="voice-assistant-input-row" onSubmit={runManualCommand}>
+                        <input
+                            type="text"
+                            value={manualCommand}
+                            onChange={(event) => setManualCommand(event.target.value)}
+                            className="voice-assistant-input"
+                            placeholder="Type a command if mic is unavailable"
+                        />
+                        <button type="submit" className="voice-assistant-run">
+                            Run
+                        </button>
+                    </form>
+
+                    <p className="voice-assistant-hint">Try:</p>
+                    <ul className="voice-assistant-list">
+                        {commandHints.map((item) => (
+                            <li key={item}>{item}</li>
+                        ))}
+                        <li>Reading style Slow</li>
+                    </ul>
                 </div>
-            ) : null}
-
-            <form className="voice-assistant-input-row" onSubmit={runManualCommand}>
-                <input
-                    type="text"
-                    value={manualCommand}
-                    onChange={(event) => setManualCommand(event.target.value)}
-                    className="voice-assistant-input"
-                    placeholder="Type a command if mic is unavailable"
-                />
-                <button type="submit" className="voice-assistant-run">
-                    Run
-                </button>
-            </form>
-
-            <p className="voice-assistant-hint">Try:</p>
-            <ul className="voice-assistant-list">
-                {commandHints.map((item) => (
-                    <li key={item}>{item}</li>
-                ))}
-                <li>Reading style Slow</li>
-            </ul>
-            </div>
             ) : null}
         </div>
     );
