@@ -1,11 +1,8 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
+  "/(routes)/vision/page": "app/(routes)/vision/page.js",
   "/page": "app/page.js",
-<<<<<<< HEAD
-  "/(routes)/product/page": "app/(routes)/product/page.js",
   "/(routes)/video/page": "app/(routes)/video/page.js",
-=======
-  "/(routes)/captions/page": "app/(routes)/captions/page.js",
->>>>>>> e0bc270bd7e6428ce4dd505bff5e79967cbd4524
-  "/(routes)/vision/page": "app/(routes)/vision/page.js"
+  "/(routes)/product/page": "app/(routes)/product/page.js",
+  "/(routes)/captions/page": "app/(routes)/captions/page.js"
 }

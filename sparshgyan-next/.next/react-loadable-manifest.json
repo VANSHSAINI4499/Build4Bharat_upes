@@ -1,22 +1,22 @@
 {
-  "components\\sections\\CtaSection.tsx -> @/components/3d/MiniCtaScene": {
-    "id": "components\\sections\\CtaSection.tsx -> @/components/3d/MiniCtaScene",
+  "components/sections/CtaSection.tsx -> @/components/3d/MiniCtaScene": {
+    "id": "components/sections/CtaSection.tsx -> @/components/3d/MiniCtaScene",
     "files": [
       "static/chunks/_app-pages-browser_components_3d_MiniCtaScene_tsx.js"
     ]
   },
-  "components\\sections\\Hero.tsx -> @/components/3d/AccessibilityScene": {
-    "id": "components\\sections\\Hero.tsx -> @/components/3d/AccessibilityScene",
+  "components/sections/Hero.tsx -> @/components/3d/AccessibilityScene": {
+    "id": "components/sections/Hero.tsx -> @/components/3d/AccessibilityScene",
     "files": [
       "static/chunks/_app-pages-browser_components_3d_AccessibilityScene_tsx.js"
     ]
   },
-  "node_modules\\@react-three\\drei\\core\\VideoTexture.js -> hls.js": {
-    "id": "node_modules\\@react-three\\drei\\core\\VideoTexture.js -> hls.js",
+  "node_modules/@react-three/drei/core/VideoTexture.js -> hls.js": {
+    "id": "node_modules/@react-three/drei/core/VideoTexture.js -> hls.js",
     "files": []
   },
-  "node_modules\\@react-three\\drei\\web\\FaceLandmarker.js -> @mediapipe/tasks-vision": {
-    "id": "node_modules\\@react-three\\drei\\web\\FaceLandmarker.js -> @mediapipe/tasks-vision",
+  "node_modules/@react-three/drei/web/FaceLandmarker.js -> @mediapipe/tasks-vision": {
+    "id": "node_modules/@react-three/drei/web/FaceLandmarker.js -> @mediapipe/tasks-vision",
     "files": []
   }
 }
