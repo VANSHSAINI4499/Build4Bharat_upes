@@ -1,0 +1,73 @@
+export const courses = [
+    {
+      id: 1,
+      title: 'The Complete Flutter Development Bootcamp with Dart',
+      category:'Flutter',
+      rating:5,
+      price: '$59.99',
+      linkImg:"https://th.bing.com/th/id/OIP.p_cKLZDCrn0-BVilZYv6GgHaEL?w=321&h=180&c=7&r=0&o=7&cb=12&dpr=1.3&pid=1.7&rm=3"
+    },
+    {
+      id: 2,
+      title: 'The Complete 2023 Web Development Bootcamp',
+      category:'Web Dev',
+      rating:4,
+      price: '$59.99',
+      linkImg:'https://th.bing.com/th/id/OIP.LAwHZyki6Jx8f4R27HAGKAHaEK?w=265&h=180&c=7&r=0&o=7&cb=12&dpr=1.3&pid=1.7&rm=3',
+    },
+    {
+      id: 3,
+      title: 'Learn Python: The Complete Python Programming CourseLearn A-Z everything about Python, from the basics, to advanced topics like Python GUI, Python Data Analysis, and more!',
+      category:'Python',
+      rating:4,
+      price: '$59.99',
+      linkImg:
+        'https://imgs.search.brave.com/Nhj_cLAZOWcUjlnR8QMX8A02rX-2RYra9w-0j-B9Rbg/rs:fit:750:422:1/g:ce/aHR0cHM6Ly9pLnBp/bmltZy5jb20vb3Jp/Z2luYWxzL2IxLzJi/L2NjL2IxMmJjYzA4/YmQ4YzlhOTFjMmM5/NjY3ZTM5NzE1NzA0/LmpwZw',
+    },
+    {
+      id: 4,
+      title: 'The Complete JavaScript Course 2023: From Zero to Expert!',
+      category:'Javascript',
+      rating:4,
+      price: '$59.99',
+      linkImg:
+        'https://imgs.search.brave.com/ERyn_YUVTbB0slaulPioLMmU7Zto9A8aCA6OPptRZkI/rs:fit:768:432:1/g:ce/aHR0cHM6Ly9jb3Vy/c2Vjb3Vwb25jbHVi/LmNvbS93cC1jb250/ZW50L3VwbG9hZHMv/MjAyMS8wMy84NTE3/MTJfZmM2MV82LTc2/OHg0MzIuanBn',
+    },
+    {
+      id: 5,
+      title: 'Cuphead',
+      category:'Flutter',
+      rating:4,
+      price: '$19.99',
+      linkImg:
+        'https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/v1/ncom/en_US/games/switch/c/cuphead-switch/hero?_a=AJADJWI0',
+    },
+    {
+      id: 6,
+      title: 'Minecraft',
+      category:'Flutter',
+      rating:4,
+      price: '$29.99',
+      linkImg:
+        'https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/v1/ncom/en_US/games/switch/m/minecraft-switch/hero?_a=AJADJWI0',
+    },
+    {
+      id: 7,
+      title: 'Mario + Rabbids® Kingdom Battle',
+      category:'Flutter',
+      rating:4,
+      price: '$59.99',
+      linkImg:
+        'https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/v1/ncom/en_US/games/switch/u/unravel-two-switch/hero?_a=AJADJWI0',
+    },
+    {
+      id: 8,
+      title: 'Unravel Two',
+      category:'Flutter',
+      rating:4,
+      price: '$59.99',
+      sale: 63,  
+      linkImg:
+        'https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/v1/ncom/en_US/games/switch/u/unravel-two-switch/hero?_a=AJADJWI0',
+    },
+  ];

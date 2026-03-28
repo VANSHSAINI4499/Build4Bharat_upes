@@ -1,0 +1,47 @@
+    # Sparshgyan: Hackathon Project Documentation
+
+## 1. Project Overview
+**Sparshgyan** is an accessibility-focused application designed to bridge the gap between digital content and physical touch, primarily targeting the Deaf and Deaf-Blind communities. The project consists of two major components:
+- A full-stack web application for user management, course discovery, and learning.
+- A hardware prototype (using Arduino) that translates digital text into physical vibrotactile feedback (Braille/Morse via a vibration motor).
+
+## 2. Directory Structure & Architecture
+The project is organized into two main workspaces:
+
+### A. Arduino Hardware (`AdrinoCodes/`)
+- `bil369.ino`: The C++ code uploaded to an Arduino Uno R3. It establishes serial communication with a computer, listens for English letters (A-Z), maps them to a digital representation of a 6-dot Braille standard, and pulses a DC Vibration Motor on Digital Pin 9 using PWM to allow users to physically "feel" the letter.
+
+### B. Full-Stack Web Application (`Gthon-Repo/`)
+Built with the MERN/PERN stack philosophy (MongoDB, Express, React, Node.js).
+
+#### Frontend (`client/`)
+Built with React, Vite, and styled with plain CSS and Tailwind.
+- `App.jsx`: The main router controlling navigation (`/` Signup/Login, `/new` Landing Dashboard, `/product` Product Details, `/video` Video page).
+- `Signup.jsx`: Handles user registration and authentication via an animated flip form. Communicates with the backend using Axios.
+- `New.jsx`: The main landing dashboard composed of multiple smaller components (Hero, Companies, Courses, Achievement, Categories, Feedback, CTA, Footer).
+- `Productdetails.jsx`: Displays mock course details, including pricing, variants, and a "Watch Video Now" route mechanism.
+- `Subtitles.jsx`: A unique accessibility component that animates standard text into visual Braille dots on the screen.
+
+#### Backend (`server/`)
+Built with Node.js and Express.js, connecting to MongoDB Atlas.
+- `index.js & app.js`: The entry points that configure the server, apply CORS, mount the database, and define the base routing (`/api/v1`).
+- `Controllers/userController.js`: Contains business logic for `/register` (hashing passwords with bcrypt) and `/login` (comparing passwords and authorizing access).
+- `Models/userModels.js`: Defines the Mongoose schema mapping for User data in the database.
+- `.env`: Stores sensitive environment variables like the port and the cloud MongoDB Atlas connection string.
+
+## 3. How the Features Work Together
+1. **User Onboarding:** A user visits the React frontend and registers an account. The credentials are encrypted and stored in MongoDB Atlas via the Express backend.
+2. **Platform Access:** Upon successful login, the user is navigated to the educational dashboard (`/new`), where they can browse courses and navigate to individual product pages (`/product`).
+3. **Accessibility Translation:** On the platform, visual elements (like `Subtitles.jsx`) act as a visual manifestation of Braille.
+4. **Physical Haptic Feedback:** Independently, the Arduino module receives text signals and physically vibrates. (In a future merged state, the React app could use the Web Serial API to send text directly from the frontend to the Arduino, creating a fully integrated deaf-blind friendly learning environment).
+
+## 4. Environment Setup (How to Run)
+**Hardware:**
+1. Connect Arduino Uno to PC.
+2. Connect DC Vibration motor (VCC->5V, GND->GND, IN->Pin9).
+3. Upload `bil369.ino` and type letters into the Serial Monitor at 9600 baud.
+
+**Software:**
+1. **Backend:** Navigate to `server/`, run `npm install`, ensure the MongoDB Atlas URI is in `.env`, then run `npm run dev`.
+2. **Frontend:** Navigate to `client/`, run `npm install`, then run `npm run dev`.
+3. Open `http://localhost:5173` in a browser.
