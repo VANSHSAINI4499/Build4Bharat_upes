@@ -12,19 +12,8 @@ const AccessibilityControls = () => {
   const portRef = useRef(null);
 
   // Python Gesture Toggle
-  const toggleGestureControl = async () => {
-    try {
-      const endpoint = gestureActive ? '/api/stop-mouse' : '/api/start-mouse';
-      const response = await fetch(`http://localhost:5000${endpoint}`, { method: 'POST' });
-      if (response.ok) {
-        setGestureActive(!gestureActive);
-      } else {
-        alert("Failed to connect to Virtual Mouse Server. Ensure Flask is running.");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Error contacting the gesture server. Please ensure the Python Flask backend is running on port 5000.");
-    }
+  const toggleGestureControl = () => {
+    setGestureActive((prev) => !prev);
   };
 
   // Arduino Web Serial Connect
@@ -109,9 +98,8 @@ const AccessibilityControls = () => {
           <button
             onClick={sendWordToArduino}
             disabled={sending}
-            className={`w-full py-1 rounded text-sm font-bold mb-2 ${
-              sending ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#20B486] text-white hover:bg-green-700'
-            }`}
+            className={`w-full py-1 rounded text-sm font-bold mb-2 ${sending ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-[#20B486] text-white hover:bg-green-700'
+              }`}
           >
             {sending ? 'Vibrating...' : '📳 Send to Device'}
           </button>
@@ -134,9 +122,8 @@ const AccessibilityControls = () => {
       {/* Gesture Control Toggle */}
       <button
         onClick={toggleGestureControl}
-        className={`px-4 py-3 rounded-full shadow-lg font-bold transition-all ${
-          gestureActive ? 'bg-red-500 text-white' : 'bg-[#20B486] text-white hover:bg-green-700'
-        }`}
+        className={`px-4 py-3 rounded-full shadow-lg font-bold transition-all ${gestureActive ? 'bg-red-500 text-white' : 'bg-[#20B486] text-white hover:bg-green-700'
+          }`}
       >
         {gestureActive ? '🛑 Stop Hand Gestures' : '🖐️ Enable Hand Gestures'}
       </button>

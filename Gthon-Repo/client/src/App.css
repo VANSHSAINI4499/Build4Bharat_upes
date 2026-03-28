@@ -1,9 +1,11 @@
 @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap');
-@import "slick-carousel/slick/slick.css";
-@import "slick-carousel/slick/slick-theme.css";
+@import 'slick-carousel/slick/slick.css';
+@import 'slick-carousel/slick/slick-theme.css';
 
 /* Global layout */
-html, body, #root {
+html,
+body,
+#root {
   margin: 0;
   padding: 0;
   height: 100%;
@@ -71,4 +73,125 @@ html, body, #root {
   padding: 4rem 1rem;
   max-width: 1280px;
   margin: 0 auto;
+}
+
+.voice-assistant-panel {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  width: min(340px, calc(100vw - 24px));
+  background: linear-gradient(145deg, #ffffff 0%, #eef8ff 100%);
+  border: 1px solid #d8e8f7;
+  box-shadow: 0 14px 32px rgba(10, 34, 56, 0.2);
+  border-radius: 14px;
+  z-index: 60;
+  padding: 14px;
+}
+
+.voice-assistant-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0b2a40;
+}
+
+.voice-assistant-meta {
+  margin: 4px 0;
+  color: #3a5f79;
+  font-size: 0.88rem;
+}
+
+.voice-assistant-feedback {
+  margin: 10px 0 0;
+  color: #123d5b;
+  font-size: 0.9rem;
+}
+
+.voice-assistant-command {
+  margin: 8px 0 0;
+  color: #1b5277;
+  font-size: 0.82rem;
+}
+
+.voice-assistant-actions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.voice-assistant-button {
+  border: none;
+  background: #0a6eff;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  border-radius: 10px;
+  cursor: pointer;
+  padding: 10px 12px;
+  min-width: 110px;
+}
+
+.voice-assistant-mic {
+  background: linear-gradient(135deg, #0a6eff 0%, #2c88ff 100%);
+}
+
+.voice-assistant-mic::before {
+  content: '🎤 ';
+}
+
+.voice-assistant-button.secondary {
+  background: #0b9a74;
+}
+
+.voice-assistant-button.active {
+  background: #d73f2f;
+}
+
+.voice-assistant-input-row {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+
+.voice-assistant-input {
+  flex: 1;
+  border: 1px solid #bfd5e8;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 0.85rem;
+  color: #133a55;
+  background: #fff;
+}
+
+.voice-assistant-run {
+  border: none;
+  border-radius: 10px;
+  background: #133a55;
+  color: #fff;
+  font-weight: 700;
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.voice-assistant-hint {
+  margin: 12px 0 6px;
+  font-size: 0.82rem;
+  color: #456074;
+}
+
+.voice-assistant-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #264860;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .voice-assistant-panel {
+    right: 8px;
+    left: 8px;
+    bottom: 10px;
+    width: auto;
+  }
 }
