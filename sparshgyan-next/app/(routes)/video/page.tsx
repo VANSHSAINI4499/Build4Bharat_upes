@@ -51,9 +51,7 @@ const COURSE_META: Record<string, { description: string; level: string; duration
 
 const VIDEO_ID = 'Oe_h_M7Drec'
 
-/* ================================================================ */
-/*  VideoPageInner                                                   */
-/* ================================================================ */
+
 function VideoPageInner() {
   const searchParams = useSearchParams()
   const courseTitle = searchParams.get('course') ?? 'AI for Accessibility'

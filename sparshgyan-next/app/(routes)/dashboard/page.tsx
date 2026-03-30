@@ -69,6 +69,9 @@ function BarChart({ data, maxVal }: { data: { label: string; value: number; colo
 // ── Animated Line Chart (SVG) ──────────────────────
 
 function LineChart({ data }: { data: { label: string; value: number }[] }) {
+  if (!data || data.length < 2) {
+    return <div className="w-full text-center text-white/40 text-sm py-8">Not enough data</div>
+  }
   const max = Math.max(...data.map((d) => d.value))
   const min = Math.min(...data.map((d) => d.value)) - 10
   const w = 300

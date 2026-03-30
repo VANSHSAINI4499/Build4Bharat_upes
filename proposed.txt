@@ -1,0 +1,13 @@
+Proposed Solution — SparshGyan
+
+1. Voice-First Navigation: A floating voice assistant lets visually impaired users navigate the entire platform hands-free using natural spoken commands (e.g., "open captions", "go home").
+
+2. Real-Time Speech-to-Text Captions: A live captioning engine converts microphone input into rolling on-screen text, making audio content accessible for deaf and hard-of-hearing learners.
+
+3. Haptic Braille Feedback via Arduino: An Arduino-based 6-dot Braille controller translates on-screen text into tactile vibration patterns, enabling blind users to "feel" letters and words in real time.
+
+4. Gesture-Controlled Virtual Mouse: A Python + MediaPipe computer-vision module interprets hand gestures from a webcam into cursor movements and clicks, empowering motor-impaired users to interact without a physical mouse.
+
+5. Inclusive Educational Content Platform: A Next.js web app serves accessible video lessons, courses, and live caption overlays — all designed with multi-modal interaction (voice, touch, vision, haptics) from the ground up.
+
+6. Parental Dashboard with Real-Time Analytics: A Firebase-powered dashboard gives parents live visibility into their child's learning progress through animated charts, skill proficiency bars, achievements, and activity feeds.
